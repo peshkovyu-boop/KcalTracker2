@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Трекер калорий</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#4da3ff" />
+  <link rel="icon" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <!-- UI -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Резервная библиотека для распознавания штрих-кодов, если нет BarcodeDetector -->
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <span class="dot"></span> Трекер калорий
+        <span class="sub">(авто-ккал и БЖУ)</span>
+      </div>
+      <div class="row">
+        <input id="date" type="date" />
+        <button id="addEntryBtn" type="button" onclick="window.__addEntry()">Добавить строку</button>
+      </div>
+    </header>
+
+    <!-- Блок штрих-кода -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="row">
+        <input id="barcode" type="text" placeholder="Штрих-код (EAN/UPC)" inputmode="numeric" />
+        <button id="findBarcode" type="button">Найти по штрих-коду</button>
+        <button id="scanCamera" type="button">Сканировать камерой</button>
+        <label class="badge" style="cursor:pointer">
+          Фото штрих-кода
+          <input id="barcodeImage" type="file" accept="image/*" capture="environment" style="display:none" />
+        </label>
+        <div class="sub" id="lookupStatus"></div>
+      </div>
+    </div>
+
+    <!-- Таблица -->
+    <div class="grid card">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Продукт</th>
+            <th>Вес, г</th>
+            <th>Ккал</th>
+            <th>Белки, г</th>
+            <th>Жиры, г</th>
+            <th>Углеводы, г</th>
+            <th class="tiny">Авто</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2">ИТОГО за день</td>
+            <td id="tWeight">0</td>
+            <td id="tKcal">0</td>
+            <td id="tP">0</td>
+            <td id="tF">0</td>
+            <td id="tC">0</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Кнопки управления под таблицей -->
+    <div class="row card" id="actionsRow">
+      <button id="saveDay" class="secondary" type="button">Сохранить день</button>
+      <button id="clearDay" class="secondary" type="button">Очистить день</button>
+      <label class="badge" style="cursor:pointer">
+        Импорт CSV<input id="importCsv" type="file" accept=".csv" style="display:none" />
+      </label>
+      <button id="exportCsv" type="button">Экспорт CSV</button>
+      <button id="clearAll" class="warn" type="button">Стереть всё</button>
+    </div>
+
+    <!-- Визуализации -->
+    <div class="card" id="viz">
+      <div class="row">
+        <select id="period">
+          <option value="day">День</option>
+          <option value="week">Неделя</option>
+          <option value="month">Месяц</option>
+          <option value="year">Год</option>
+        </select>
+        <div class="spacer"></div>
+        <label class="badge" title="Цель калорий на выбранный период">
+          Цель, ккал
+          <input id="kcalGoal" type="number" min="0" step="50" style="width:110px;margin-left:8px" />
+        </label>
+      </div>
+
+      <div class="viz-grid">
+        <canvas id="kpiGauge" height="220"></canvas>
+        <canvas id="pieMacros" height="220"></canvas>
+        <canvas id="trendDaily" height="220"></canvas>
+      </div>
+    </div>
+
+    <p class="hint">Начни вводить название — подсказки из внутренней базы и онлайн. По штрих-коду: локальная база напитков → Open Food Facts.</p>
+  </div>
+
+  <!-- datalist -->
+  <datalist id="foods"></datalist>
+
+  <!-- Модал сканера -->
+  <div id="camModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="title tiny">Сканирование штрих-кода</div>
+        <button id="closeCam" type="button" class="secondary">Закрыть</button>
+      </div>
+      <div class="cam-wrap">
+        <video id="camVideo" autoplay playsinline></video>
+        <canvas id="camCanvas"></canvas>
+        <div id="camHint" class="hint">Наведи камеру на штрих-код…</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
