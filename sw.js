@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calctracker-cache-v9';
+const CACHE_NAME = 'calctracker-cache-v10';
 const PRECACHE = [
   './',
   './index.html',
@@ -45,5 +45,6 @@ self.addEventListener('fetch', (e) => {
     })());
   }
 });
+
 
 
