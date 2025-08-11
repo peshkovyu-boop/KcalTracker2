@@ -8,28 +8,29 @@
   <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#4da3ff" />
-  <link rel="icon" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
   <!-- UI -->
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/style.css" />
 
-  <!-- Резервная библиотека для распознавания штрих-кодов, если нет BarcodeDetector -->
+  <!-- Fallback для распознавания штрих-кодов -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
-  <script src="app.js" defer></script>
+  <script src="/app.js" defer></script>
 </head>
 <body>
   <div class="wrap">
-    <header class="app-header">
-  <div class="title">
-    <span class="dot"></span> Трекер калорий
-  </div>
-  <div class="row">
-    <input id="date" type="date" />
-    <button id="addEntryBtn" type="button">Добавить строку</button>
-  </div>
-</header>
 
+    <!-- ЗАКРЕПЛЁННАЯ ШАПКА -->
+    <header class="app-header card">
+      <div class="title">
+        <span class="dot"></span> Трекер калорий
+      </div>
+      <div class="row">
+        <input id="date" type="date" />
+        <button id="addEntryBtn" type="button" onclick="window.__addEntry()">Добавить строку</button>
+      </div>
+    </header>
 
     <!-- Блок штрих-кода -->
     <div class="card" style="margin-bottom:14px">
@@ -37,10 +38,11 @@
         <input id="barcode" type="text" placeholder="Штрих-код (EAN/UPC)" inputmode="numeric" />
         <button id="findBarcode" type="button">Найти по штрих-коду</button>
         <button id="scanCamera" type="button">Сканировать камерой</button>
-        <label class="badge" style="cursor:pointer">
-          Фото штрих-кода
-          <input id="barcodeImage" type="file" accept="image/*" capture="environment" style="display:none" />
-        </label>
+
+        <!-- Фото штрих-кода: такая же синяя кнопка -->
+        <button id="photoBtn" class="photo-btn" type="button">Фото штрих-кода</button>
+        <input id="barcodeImage" type="file" accept="image/*" capture="environment" style="display:none" />
+
         <div class="sub" id="lookupStatus"></div>
       </div>
     </div>
@@ -77,7 +79,7 @@
       </table>
     </div>
 
-    <!-- Кнопки управления под таблицей -->
+    <!-- Кнопки управления -->
     <div class="row card" id="actionsRow">
       <button id="saveDay" class="secondary" type="button">Сохранить день</button>
       <button id="clearDay" class="secondary" type="button">Очистить день</button>
@@ -98,9 +100,9 @@
           <option value="year">Год</option>
         </select>
         <div class="spacer"></div>
-        <label class="badge" title="Цель калорий на выбранный период">
-          Цель, ккал
-          <input id="kcalGoal" type="number" min="0" step="50" style="width:110px;margin-left:8px" />
+        <label class="badge" title="Предельное значение калорий за период">
+          Предел ккал
+          <input id="kcalGoal" type="number" min="0" step="50" style="width:120px;margin-left:8px" />
         </label>
       </div>
 
@@ -111,10 +113,9 @@
       </div>
     </div>
 
-    <p class="hint">Начни вводить название — подсказки из внутренней базы и онлайн. По штрих-коду: локальная база напитков → Open Food Facts.</p>
+    <p class="hint">Подсказки — из локальной базы и Open Food Facts. По штрих-коду: локальная база напитков → OFF.</p>
   </div>
 
-  <!-- datalist -->
   <datalist id="foods"></datalist>
 
   <!-- Модал сканера -->
@@ -133,5 +134,3 @@
   </div>
 </body>
 </html>
-
-
