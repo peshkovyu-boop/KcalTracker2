@@ -388,59 +388,88 @@ function drawPie(cv, kcalP, kcalF, kcalC){
   const cx = W/2, cy = H/2;
   const R  = Math.min(W,H) * 0.38;
 
-  // Приглушённая палитра в стиле приложения
-  const colP = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#4da3ff'; // белки — синий
-  const colF = '#d75d5d';   // жиры — приглушённый красный (родство с --warn)
-  const colC = '#5a7d9a';   // углеводы — спокойный серо-голубой
-
-  // Лёгкие градиенты для глубины
-  function grad(color){
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, color);
-    g.addColorStop(1, '#1a2332'); // лёгкое затемнение к краю
-    return g;
-  }
+  // Спокойная палитра
+  const colP = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#4da3ff'; // Б (синий)
+  const colF = '#d75d5d';   // Ж (приглушённый красный)
+  const colC = '#5a7d9a';   // У (серо-голубой)
 
   const parts = [
-    { v: Math.max(0, +kcalP || 0), color: grad(colP), label:'Б' },
-    { v: Math.max(0, +kcalF || 0), color: grad(colF), label:'Ж' },
-    { v: Math.max(0, +kcalC || 0), color: grad(colC), label:'У' },
+    { v: Math.max(0, +kcalP || 0), color: colP, label:'Б' },
+    { v: Math.max(0, +kcalF || 0), color: colF, label:'Ж' },
+    { v: Math.max(0, +kcalC || 0), color: colC, label:'У' },
   ];
-  const total = parts.reduce((s,p)=>s+p.v,0) || 1;
+  const total = parts.reduce((s,p)=>s+p.v,0);
+  if (total <= 0){
+    // Пустой круг с тонкой окружностью
+    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.lineWidth = Math.max(2, R*0.06);
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#9fb0c3';
+    ctx.font = `${Math.max(12, Math.round(R*0.18))}px system-ui`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('нет данных', cx, cy);
+    return;
+  }
 
-  // Тень под пирог
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,.35)';
-  ctx.shadowBlur = Math.max(8, R*0.12);
-  ctx.shadowOffsetY = Math.max(4, R*0.06);
-
+  // Рисуем сектора (строго минимализм)
   let a0 = -Math.PI/2;
   parts.forEach(p=>{
     const a = (p.v/total)*Math.PI*2;
-
-    // сектор
     ctx.beginPath(); ctx.moveTo(cx,cy);
     ctx.fillStyle = p.color;
-    ctx.arc(cx,cy,R,a0,a0+a); ctx.closePath(); ctx.fill();
-
-    // тонкая разделительная линия
-    ctx.strokeStyle = 'rgba(255,255,255,.08)';
-    ctx.lineWidth = Math.max(1, R*0.02);
-    ctx.beginPath(); ctx.arc(cx,cy,R, a0, a0+a); ctx.stroke();
-
-    // буква прямо на секторе
-    const mid = a0 + a/2;
-    const rx = cx + Math.cos(mid) * R*0.58;
-    const ry = cy + Math.sin(mid) * R*0.58;
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = `${Math.max(14, Math.round(R*0.22))}px system-ui`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(p.label, rx, ry);
-
+    ctx.arc(cx,cy,R, a0, a0+a); ctx.closePath(); ctx.fill();
     a0 += a;
   });
 
-  ctx.restore();
+  // Тонкие разделители
+  ctx.strokeStyle = 'rgba(255,255,255,.08)';
+  ctx.lineWidth = Math.max(1, R*0.02);
+  a0 = -Math.PI/2;
+  parts.forEach(p=>{
+    const a = (p.v/total)*Math.PI*2;
+    ctx.beginPath(); ctx.arc(cx,cy,R, a0, a0+a); ctx.stroke();
+    a0 += a;
+  });
+
+  // Подписи на/у сектора: «Б 34%», «Ж 28%», «У 38%»
+  ctx.fillStyle = '#e6edf3';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const baseFont = Math.max(13, Math.round(R*0.2));
+
+  a0 = -Math.PI/2;
+  parts.forEach(p=>{
+    const a = (p.v/total)*Math.PI*2;
+    const mid = a0 + a/2;
+    const percent = Math.round((p.v/total)*100);
+
+    // Если сектор маленький (<8%), выносим подпись наружу с короткой линейкой
+    if (percent < 8) {
+      const r1 = R*0.78, r2 = R*0.94;
+      const x1 = cx + Math.cos(mid)*r1;
+      const y1 = cy + Math.sin(mid)*r1;
+      const x2 = cx + Math.cos(mid)*r2;
+      const y2 = cy + Math.sin(mid)*r2;
+      ctx.strokeStyle = 'rgba(255,255,255,.25)';
+      ctx.lineWidth = Math.max(1, R*0.02);
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+
+      const outsideX = cx + Math.cos(mid)*(r2 + R*0.12);
+      const outsideY = cy + Math.sin(mid)*(r2 + R*0.12);
+      ctx.font = `${baseFont}px system-ui`;
+      ctx.textAlign = (Math.cos(mid) >= 0) ? 'left' : 'right';
+      ctx.fillText(`${p.label} ${percent}%`, outsideX, outsideY);
+    } else {
+      // Внутри сектора
+      const rx = cx + Math.cos(mid) * R*0.58;
+      const ry = cy + Math.sin(mid) * R*0.58;
+      ctx.font = `${baseFont}px system-ui`;
+      ctx.textAlign='center';
+      ctx.fillText(`${p.label} ${percent}%`, rx, ry);
+    }
+
+    a0 += a;
+  });
 }
 
 
@@ -681,6 +710,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
+
 
 
 
