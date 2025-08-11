@@ -1,84 +1,84 @@
-// ====== КЛЮЧИ ======
-const STORE_KEY = 'calctracker:v9';
-const CACHE_KEY = 'calctracker:offCache:v4';
-const GOAL_KEY  = 'calctracker:goalKcal';
+// ========= КЛЮЧИ/КОНСТАНТЫ =========
+const STORE_KEY = 'calctracker:v13';
+const CACHE_KEY = 'calctracker:offCache:v6';
+const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал"
 
-// ====== ВСТРОЕННАЯ МИНИ-БАЗА (на 100 г) — подстраховка ======
+// ========= МИНИ-БАЗА (подстраховка, на 100 г) =========
 const FOOD_DB = [
   {name:'Овсяные хлопья (сухие)', kcal:370, p:13, f:7, c:62},
-  {name:'Рис варёный', kcal:130, p:2.7, f:0.3, c:28},
-  {name:'Гречка варёная', kcal:110, p:3.6, f:1.1, c:20},
-  {name:'Куриная грудка (варёная)', kcal:165, p:31, f:3.6, c:0},
-  {name:'Творог 5%', kcal:121, p:17, f:5, c:3},
-  {name:'Оливковое масло', kcal:884, p:0, f:100, c:0},
+  {name:'Рис варёный',            kcal:130, p:2.7, f:0.3, c:28},
+  {name:'Гречка варёная',         kcal:110, p:3.6, f:1.1, c:20},
+  {name:'Куриная грудка (варёная)',kcal:165, p:31, f:3.6, c:0},
+  {name:'Творог 5%',              kcal:121, p:17, f:5, c:3},
+  {name:'Оливковое масло',        kcal:884, p:0,  f:100, c:0},
   {name:'Яичница (жареные яйца)', kcal:196, p:13, f:15, c:1.2}
 ];
-const FOOD_INDEX_BUILTIN = new Map(FOOD_DB.map(f => [f.name.toLowerCase(), f]));
+const BUILTIN_INDEX = new Map(FOOD_DB.map(f => [f.name.toLowerCase(), f]));
 
-// ====== УТИЛИТЫ ======
-const $ = s=>document.querySelector(s);
-const todayISO = ()=>{ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; };
-const fmt = n=> Number.isFinite(+n) ? (Math.round(+n*100)/100).toString() : '';
-const loadAll = ()=> { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
-const saveAll = (d)=> localStorage.setItem(STORE_KEY, JSON.stringify(d));
-const loadCache = ()=> { try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; } };
-const saveCache = (c)=> localStorage.setItem(CACHE_KEY, JSON.stringify(c));
+// ========= УТИЛИТЫ =========
+const $ = s => document.querySelector(s);
+const todayISO = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+};
+const fmt = n => Number.isFinite(+n) ? String(Math.round(+n*100)/100) : '';
+const loadAll = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
+const saveAll = d => localStorage.setItem(STORE_KEY, JSON.stringify(d));
+const loadCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; } };
+const saveCache = c => localStorage.setItem(CACHE_KEY, JSON.stringify(c));
 
-// ====== СОСТОЯНИЕ ======
+// ========= СОСТОЯНИЕ =========
 const state = { date: todayISO(), rows: [] };
 let offCache = loadCache();
 
-// ====== PWA SW ======
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(console.warn); }
+// ========= PWA SW =========
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(console.warn);
+}
 
-// ====== ВНЕШНИЕ ЛОКАЛЬНЫЕ БАЗЫ ======
-let DRINKS = [];           // [{name, codes[], per100:{kcal,p,f,c}}]
-let DRINKS_BY_CODE = new Map();
-let FOODS = [];            // [{name, per100:{...}}]
-let FOODS_BY_NAME = new Map();
+// ========= ВНЕШНИЕ БАЗЫ =========
+let DRINKS = [], DRINKS_BY_CODE = new Map();
+let FOODS = [], FOODS_BY_NAME = new Map();
 
 async function safeFetchJSON(path){
   try{
-    const r = await fetch(path, {cache:'no-cache'});
+    const r = await fetch(path, { cache: 'no-cache' });
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
   }catch(e){
-    console.warn(`Не удалось загрузить ${path}:`, e);
+    console.warn('fetch JSON fail', path, e);
     return null;
   }
 }
 async function loadDrinks(){
-  const list = await safeFetchJSON('./drinks.json');
+  const list = await safeFetchJSON('/drinks.json');
   if(Array.isArray(list)){
     DRINKS = list;
     DRINKS_BY_CODE = new Map();
-    DRINKS.forEach(item=> (item.codes||[]).forEach(code=> DRINKS_BY_CODE.set(String(code), item)));
-  }else{
-    DRINKS = []; DRINKS_BY_CODE = new Map();
-  }
+    DRINKS.forEach(item => (item.codes||[]).forEach(code => DRINKS_BY_CODE.set(String(code), item)));
+  } else { DRINKS=[]; DRINKS_BY_CODE=new Map(); }
 }
 async function loadFoods(){
-  const list = await safeFetchJSON('./foods.json');
+  const list = await safeFetchJSON('/foods.json');
   if(Array.isArray(list)){
     FOODS = list;
-    FOODS_BY_NAME = new Map(list.map(item=>[item.name.toLowerCase(), item]));
-  }else{
-    FOODS = []; FOODS_BY_NAME = new Map();
-  }
+    FOODS_BY_NAME = new Map(list.map(it => [it.name.toLowerCase(), it]));
+  } else { FOODS=[]; FOODS_BY_NAME=new Map(); }
 }
 
-// ====== OFF: извлечение нутриентов ======
+// ========= Open Food Facts =========
 function extractNutrients(p){
   if(!p || !p.nutriments) return null;
   const n = p.nutriments;
   let kcal = n['energy-kcal_100g'];
-  if(!Number.isFinite(+kcal)){ const kJ = n['energy_100g']; if(Number.isFinite(+kJ)) kcal = +kJ/4.184; }
+  if(!Number.isFinite(+kcal)){
+    const kJ = n['energy_100g'];
+    if(Number.isFinite(+kJ)) kcal = +kJ/4.184;
+  }
   const proteins = n['proteins_100g'], fat = n['fat_100g'], carbs = n['carbohydrates_100g'];
   if([kcal, proteins, fat, carbs].some(v => !Number.isFinite(+v))) return null;
   return { kcal:+(+kcal).toFixed(1), p:+(+proteins).toFixed(2), f:+(+fat).toFixed(2), c:+(+carbs).toFixed(2) };
 }
-
-// По имени (автодоп — сначала локальная foods.json / затем OFF)
 async function searchOFF(query, limit=20){
   const q = String(query||'').trim(); if(!q) return [];
   const key = `q:${q.toLowerCase()}`; if(offCache[key]) return offCache[key];
@@ -91,18 +91,19 @@ async function searchOFF(query, limit=20){
   }).filter(Boolean);
   offCache[key] = out; saveCache(offCache); return out;
 }
-
-// По штрих-коду: 0) drinks.json; 1) /product; 2) поиск по коду
 async function fetchByBarcode(code){
-  const c = String(code||'').replace(/\D/g,''); if(!c) return null;
+  const c = String(code||'').replace(/\D/g,'');
+  if(!c) return null;
   const key = `barcode:${c}`; if(offCache[key]) return offCache[key];
 
+  // 0) Локальная база напитков
   const local = DRINKS_BY_CODE.get(c);
   if(local?.per100){
-    const out = { name: local.name, code: c, ...local.per100 };
-    offCache[key] = out; saveCache(offCache); return out;
+    const out = { name: local.name, code:c, ...local.per100 };
+    offCache[key]=out; saveCache(offCache); return out;
   }
 
+  // 1) OFF /product
   try{
     const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${c}.json`);
     const data = await res.json();
@@ -110,11 +111,13 @@ async function fetchByBarcode(code){
       const nut = extractNutrients(data.product);
       if(nut){
         const name = [data.product.product_name, data.product.brands].filter(Boolean).join(' • ') || c;
-        const out = { name, code:c, ...nut }; offCache[key]=out; saveCache(offCache); return out;
+        const out = { name, code:c, ...nut };
+        offCache[key]=out; saveCache(offCache); return out;
       }
     }
-  }catch(e){/* ignore */}
+  }catch{}
 
+  // 2) OFF search by code
   try{
     const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${c}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,brands,nutriments,code`);
     const data = await res.json();
@@ -122,14 +125,14 @@ async function fetchByBarcode(code){
     if(prod){
       const nut = extractNutrients(prod);
       const name = [prod.product_name, prod.brands].filter(Boolean).join(' • ') || c;
-      const out = { name, code:c, ...nut }; offCache[key]=out; saveCache(offCache); return out;
+      const out = { name, code:c, ...nut };
+      offCache[key]=out; saveCache(offCache); return out;
     }
-  }catch(e){/* ignore */}
-
+  }catch{}
   return null;
 }
 
-// ====== РЕНДЕР / ТАБЛИЦА ======
+// ========= РЕНДЕР / ТАБЛИЦА =========
 function renderDatalist(options){
   const dl = $('#foods'); if(!dl) return;
   dl.innerHTML='';
@@ -164,13 +167,13 @@ function addEntry(){
   $('#tbl tbody').appendChild(buildRow(state.rows[state.rows.length-1], state.rows.length-1));
   recalcTotals();
 }
-window.__addEntry = ()=> addEntry();
+window.__addEntry = () => addEntry();
 
 function loadDay(date){
   const all = loadAll();
   state.date = date;
   state.rows = (all[date] || []).map(r=>({auto:true, source:null, ...r}));
-  $('#date').value = date;
+  const dateEl = $('#date'); if(dateEl) dateEl.value = date;
   renderTable();
 }
 function saveDay(){
@@ -181,36 +184,36 @@ function saveDay(){
   saveAll(all);
 }
 
-// ====== ПЕРЕСЧЁТ ======
+// ========= ПОДБОР ПРОДУКТА И АВТОПОДСЧЁТ =========
 function findLocalByName(name){
   const key = (name||'').toLowerCase().trim();
   if(!key) return null;
   const byExact = FOODS_BY_NAME.get(key);
   if(byExact?.per100) return byExact.per100;
-  if(FOODS.length){
-    const hit = FOODS.find(f => f.name.toLowerCase()===key) ||
-                FOODS.find(f => f.name.toLowerCase().startsWith(key)) ||
-                FOODS.find(f => f.name.toLowerCase().includes(key));
-    if(hit?.per100) return hit.per100;
-  }
-  return FOOD_INDEX_BUILTIN.get(key) ||
-         FOOD_DB.find(f => f.name.toLowerCase()===key) ||
-         FOOD_DB.find(f => f.name.toLowerCase().startsWith(key)) ||
-         FOOD_DB.find(f => f.name.toLowerCase().includes(key)) ||
-         null;
+
+  const hit = FOODS.find(f => f.name.toLowerCase()===key)
+          || FOODS.find(f => f.name.toLowerCase().startsWith(key))
+          || FOODS.find(f => f.name.toLowerCase().includes(key));
+  if(hit?.per100) return hit.per100;
+
+  return BUILTIN_INDEX.get(key)
+      || FOOD_DB.find(f => f.name.toLowerCase()===key)
+      || FOOD_DB.find(f => f.name.toLowerCase().startsWith(key))
+      || FOOD_DB.find(f => f.name.toLowerCase().includes(key))
+      || null;
 }
 function applyAutoToRow(i){
   const r = state.rows[i]; if(!r || r.auto===false) return;
 
+  const w = +r.weight || 0;
   if(r._per100){
-    const k = (+r.weight||0)/100;
+    const k = w/100;
     r.kcal = +(r._per100.kcal * k).toFixed(1);
     r.p    = +(r._per100.p    * k).toFixed(2);
     r.f    = +(r._per100.f    * k).toFixed(2);
     r.c    = +(r._per100.c    * k).toFixed(2);
   } else {
     const f = findLocalByName(r.product);
-    const w = +r.weight || 0;
     if(f && w>0){
       const k = w/100;
       r.kcal = +(f.kcal * k).toFixed(1);
@@ -241,7 +244,7 @@ function recalcTotals(){
   return sum;
 }
 
-// ====== CSV ======
+// ========= CSV =========
 function toCSV(delim=';'){
   const all = loadAll();
   const rows = [["Date","Product","Weight","Calories","Protein","Fat","Carbs"]];
@@ -253,7 +256,7 @@ function toCSV(delim=';'){
   return rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(delim)).join('\n');
 }
 function downloadCSV(){
-  const csv = '\uFEFF' + toCSV(';');
+  const csv = '\uFEFF' + toCSV(';'); // UTF-8 BOM для русских букв
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'calctracker.csv'; a.click();
@@ -287,10 +290,10 @@ function importCSV(text){
     all[date] = all[date] || [];
     all[date].push({ product, weight:+weight||0, kcal:+kcal||0, p:+p||0, f:+f||0, c:+c||0 });
   }
-  saveAll(all); loadDay($('#date').value);
+  saveAll(all); loadDay($('#date')?.value || todayISO());
 }
 
-// ====== ВИЗУАЛИЗАЦИЯ ======
+// ========= ВИЗУАЛИЗАЦИИ (canvas) =========
 function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
 function rangeByKind(kind){
   const end = startOfToday();
@@ -327,50 +330,87 @@ function ensureCanvasSize(cv){
   cv.height = (r.height || 220) * devicePixelRatio;
   cv.style.height = (cv.height/devicePixelRatio) + 'px';
 }
-function drawGauge(cv, value, target){
+
+// KPI-датчик с подсветкой превышения
+function drawGauge(cv, value, limit){
   ensureCanvasSize(cv);
   const ctx=cv.getContext('2d'); clearCanvas(cv);
   const W=cv.width, H=cv.height; const cx=W/2, cy=H/2; const R=Math.min(W,H)*0.35;
-  const pct = target>0 ? Math.min(1, value/target) : 0;
+  const baseStart = Math.PI*0.75, baseEnd = Math.PI*0.25;
   ctx.lineWidth = Math.max(12, R*0.18);
-  ctx.strokeStyle='#1a2332'; ctx.beginPath(); ctx.arc(cx,cy,R,Math.PI*0.75,Math.PI*0.25,false); ctx.stroke();
+  // фон дуги
+  ctx.strokeStyle='#1a2332'; ctx.beginPath(); ctx.arc(cx,cy,R,baseStart,baseEnd,false); ctx.stroke();
+  // значение
+  let pct = 0;
+  if(limit>0) pct = Math.min(1, value/limit);
   const grad = ctx.createLinearGradient(0,0,W,0);
   grad.addColorStop(0,'#4da3ff'); grad.addColorStop(1,'#7ddc82');
-  ctx.strokeStyle = grad; ctx.beginPath();
-  ctx.arc(cx,cy,R,Math.PI*0.75, Math.PI*0.75 + (Math.PI*1.5)*pct, false); ctx.stroke();
-  ctx.fillStyle='#c5d0db'; ctx.font = `${Math.round(R*0.28)}px system-ui`;
-  ctx.textAlign='center'; ctx.fillText(`${Math.round(value)} ккал`, cx, cy);
-  ctx.font = `${Math.round(R*0.18)}px system-ui`; ctx.fillStyle='#9fb0c3';
-  ctx.fillText(`Цель: ${target||0}`, cx, cy + R*0.35);
+  ctx.strokeStyle = (limit>0 && value>limit) ? '#ff6b6b' : grad;
+  ctx.beginPath();
+  ctx.arc(cx,cy,R,baseStart, baseStart + (Math.PI*1.5)*(limit>0?Math.min(1,value/limit):0), false);
+  ctx.stroke();
+  // Текст
+  ctx.fillStyle = (limit>0 && value>limit) ? '#ffb3b3' : '#c5d0db';
+  ctx.textAlign='center';
+  ctx.font = `${Math.round(R*0.28)}px system-ui`;
+  ctx.fillText(`${Math.round(value)} ккал`, cx, cy);
+  ctx.font = `${Math.round(R*0.18)}px system-ui`;
+  ctx.fillStyle = (limit>0 && value>limit) ? '#ff6b6b' : '#9fb0c3';
+  ctx.fillText(`Предел: ${limit||0}`, cx, cy + R*0.35);
+  if(limit>0 && value>limit){
+    ctx.font = `${Math.round(R*0.16)}px system-ui`;
+    ctx.fillStyle='#ff6b6b';
+    ctx.fillText('Превышение', cx, cy - R*0.55);
+  }
 }
+
+// Пирог БЖУ (в цветах приложения) с подписями на секторах
 function drawPie(cv, kcalP, kcalF, kcalC){
   ensureCanvasSize(cv);
   const ctx=cv.getContext('2d'); clearCanvas(cv);
   const W=cv.width, H=cv.height; const cx=W/2, cy=H/2; const R=Math.min(W,H)*0.38;
-  const parts=[{v:kcalP, c:'#7ddc82', n:'Белки'},{v:kcalF, c:'#ffb86b', n:'Жиры'},{v:kcalC, c:'#4da3ff', n:'Углев'}];
-  const total = parts.reduce((s,p)=>s+p.v,0) || 1;
-  let a0=-Math.PI/2;
+  const parts = [
+    {v:kcalP, color:'#7ddc82', label:'Белки'},   // зелёный
+    {v:kcalF, color:'#ff9f5f', label:'Жиры'},    // оранжевый
+    {v:kcalC, color:'#4da3ff', label:'Углев'}    // синий
+  ];
+  const total = parts.reduce((s,p)=>s+(+p.v||0),0) || 1;
+  let a0 = -Math.PI/2;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
   parts.forEach(p=>{
     const a = (p.v/total)*Math.PI*2;
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.fillStyle=p.c; ctx.arc(cx,cy,R,a0,a0+a); ctx.closePath(); ctx.fill();
-    a0+=a;
+    // сектор
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.fillStyle=p.color; ctx.arc(cx,cy,R,a0,a0+a); ctx.closePath(); ctx.fill();
+    // подпись
+    const mid = a0 + a/2;
+    const rx = cx + Math.cos(mid) * R*0.6;
+    const ry = cy + Math.sin(mid) * R*0.6;
+    ctx.fillStyle='#0b0f14';
+    ctx.font = `${Math.max(12, Math.round(R*0.16))}px system-ui`;
+    const percent = Math.round((p.v/total)*100);
+    ctx.fillText(`${p.label} ${percent}%`, rx, ry);
+    a0 += a;
   });
-  ctx.fillStyle='#c5d0db'; ctx.font='14px system-ui'; ctx.textAlign='center';
-  ctx.fillText(`P:${Math.round(kcalP)}  F:${Math.round(kcalF)}  C:${Math.round(kcalC)}`, cx, cy+R+24);
 }
+
+// Линия тренда (ккал по дням)
 function drawTrend(cv, points){
   ensureCanvasSize(cv);
   const ctx=cv.getContext('2d'); clearCanvas(cv);
   const W=cv.width, H=cv.height; const pad=36; const w=W-pad*2; const h=H-pad*2;
   const maxVal = Math.max(1, ...points.map(p=>p.value));
+  // оси
   ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.beginPath();
   ctx.moveTo(pad, H-pad); ctx.lineTo(W-pad, H-pad); ctx.moveTo(pad, pad); ctx.lineTo(pad, H-pad); ctx.stroke();
+  // линия
   ctx.beginPath(); ctx.strokeStyle='#4da3ff'; ctx.lineWidth=2;
   points.forEach((p,i)=>{
     const x = pad + (w * (i/(Math.max(1,points.length-1))));
     const y = H - pad - (h * (p.value/maxVal));
     if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   }); ctx.stroke();
+  // подписи дат снизу
   ctx.fillStyle='#c5d0db'; ctx.font='11px system-ui';
   points.forEach((p,i)=>{
     const x = pad + (w * (i/(Math.max(1,points.length-1)))); const y = H - pad + 14;
@@ -379,29 +419,27 @@ function drawTrend(cv, points){
 }
 function refreshViz(){
   try{
-    const kind = $('#period').value || 'day';
+    const kind = $('#period')?.value || 'day';
     const { total, days } = aggregateRange(kind);
     const cv1 = $('#kpiGauge'); const cv2 = $('#pieMacros'); const cv3 = $('#trendDaily');
-    const goal = +(localStorage.getItem(GOAL_KEY)||'0') || 0;
-    $('#kcalGoal').value = goal || '';
-    if(cv1) drawGauge(cv1, total.kcal, goal);
+    const limit = +(localStorage.getItem(LIMIT_KEY)||'0') || 0;
+    const inp = $('#kcalGoal'); if(inp) inp.value = limit || '';
+    if(cv1) drawGauge(cv1, total.kcal, limit);
     if(cv2){ const kcalP = total.p*4, kcalF = total.f*9, kcalC = total.c*4; drawPie(cv2, kcalP, kcalF, kcalC); }
     if(cv3) drawTrend(cv3, days.map(d=>({label:d.date, value:d.kcal})));
   }catch(e){ console.warn('viz error', e); }
 }
 
-// ====== ВВОД / ПОИСК ======
+// ========= ВВОД/ПОИСК =========
 let debounceTimer = null;
 async function onProductInput(i, value){
   state.rows[i]._per100 = null;
-
   const lower = String(value||'').toLowerCase().trim();
   const local = FOODS_BY_NAME.get(lower);
   if(local?.per100){
     state.rows[i]._per100 = {...local.per100};
     applyAutoToRow(i); recalcTotals(); renderDatalist(); return;
   }
-
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(async ()=>{
     try{
@@ -418,11 +456,11 @@ async function onProductInput(i, value){
 }
 
 async function onFindBarcode(){
-  const code = $('#barcode').value;
-  $('#lookupStatus').textContent = 'Поиск...';
+  const code = $('#barcode')?.value || '';
+  const st = $('#lookupStatus'); if(st) st.textContent = 'Поиск...';
   try{
     const p = await fetchByBarcode(code);
-    if(!p){ $('#lookupStatus').textContent = 'Не найдено'; return; }
+    if(!p){ if(st) st.textContent = 'Не найдено'; return; }
     addEntry();
     const i = state.rows.length - 1;
     state.rows[i].product = p.name;
@@ -431,27 +469,35 @@ async function onFindBarcode(){
     const tr = $('#tbl tbody').children[i];
     tr.querySelector('input[data-k="product"]').value = p.name;
     applyAutoToRow(i); recalcTotals();
-    $('#lookupStatus').textContent = 'Готово';
-  }catch(e){ $('#lookupStatus').textContent = 'Ошибка'; }
+    if(st) st.textContent = 'Готово';
+  }catch(e){ if(st) st.textContent = 'Ошибка'; }
 }
 
-// ====== СКАНЕР ======
+// ========= СКАНЕР =========
 let stream=null, rafId=null, detector=null;
 function hasBarcodeDetector(){ return 'BarcodeDetector' in window; }
-async function ensureDetector(){ if(detector || !hasBarcodeDetector()) return; try{ detector=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']}); }catch{} }
+async function ensureDetector(){
+  if(detector || !hasBarcodeDetector()) return;
+  try{
+    detector = new window.BarcodeDetector({
+      formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']
+    });
+  }catch{}
+}
 async function startCameraScan(){
-  // HTTPS обязателен
-  $('#lookupStatus').textContent = ''; $('#camModal').classList.remove('hidden');
+  const st = $('#lookupStatus'); if(st) st.textContent='';
+  $('#camModal')?.classList.remove('hidden');
   if(!window.ZXing){
     const s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/@zxing/library@latest'; document.head.appendChild(s);
   }
   await ensureDetector();
   try{
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio:false });
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
   }catch(e){
     if(window.ZXing){ return startZXingVideo(); }
-    $('#camHint').textContent='Нет доступа к камере (проверь HTTPS/разрешения)'; return;
+    $('#camHint').textContent='Нет доступа к камере (проверь HTTPS/разрешения)';
+    return;
   }
   const video = $('#camVideo'); video.srcObject = stream; await video.play();
   const loop = async ()=>{
@@ -467,10 +513,15 @@ async function startCameraScan(){
 }
 async function stopCameraScan(){
   if(rafId) cancelAnimationFrame(rafId); rafId=null;
-  const video=$('#camVideo'); if(video && video.srcObject){ video.pause(); video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
-  $('#camModal').classList.add('hidden');
+  const video=$('#camVideo');
+  if(video && video.srcObject){ video.pause(); video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
+  $('#camModal')?.classList.add('hidden');
 }
-async function onCodeDetected(code){ $('#barcode').value = code; $('#lookupStatus').textContent = `Код: ${code}`; await onFindBarcode(); }
+async function onCodeDetected(code){
+  const el = $('#barcode'); if(el) el.value = code;
+  const st = $('#lookupStatus'); if(st) st.textContent = `Код: ${code}`;
+  await onFindBarcode();
+}
 async function startZXingVideo(){
   try{
     const codeReader = new window.ZXing.BrowserMultiFormatReader();
@@ -480,7 +531,7 @@ async function startZXingVideo(){
   }catch(e){ $('#camHint').textContent = 'Камера/ZXing недоступны.'; }
 }
 async function scanImageFile(file){
-  $('#lookupStatus').textContent = 'Распознаю...';
+  const st = $('#lookupStatus'); if(st) st.textContent = 'Распознаю...';
   await ensureDetector();
   try{
     if(detector && 'createImageBitmap' in window){
@@ -491,24 +542,25 @@ async function scanImageFile(file){
   try{
     if(window.ZXing){
       const codeReader = new window.ZXing.BrowserMultiFormatReader();
-      const img = URL.createObjectURL(file); const res = await codeReader.decodeFromImageUrl(img); URL.revokeObjectURL(img);
+      const img = URL.createObjectURL(file);
+      const res = await codeReader.decodeFromImageUrl(img);
+      URL.revokeObjectURL(img);
       if(res && res.getText){ await onCodeDetected(res.getText()); return; }
     }
-    $('#lookupStatus').textContent = 'Код не распознан';
-  }catch{ $('#lookupStatus').textContent = 'Не удалось распознать'; }
+    if(st) st.textContent = 'Код не распознан';
+  }catch{ if(st) st.textContent = 'Не удалось распознать'; }
 }
 
-// ====== СЛУШАТЕЛИ ======
+// ========= СЛУШАТЕЛИ / ИНИЦ =========
 document.addEventListener('DOMContentLoaded', async ()=>{
-  $('#date').value = todayISO();
+  const dateEl = $('#date'); if(dateEl) dateEl.value = todayISO();
 
-  // Загрузка баз + статус
-  $('#lookupStatus').textContent = 'Загружаю базы...';
+  const st = $('#lookupStatus'); if(st) st.textContent = 'Загружаю базы...';
   await Promise.all([loadDrinks(), loadFoods()]);
-  $('#lookupStatus').textContent = `Базы: напитков ${DRINKS.length}, блюд ${FOODS.length}`;
+  if(st) st.textContent = `Базы: напитков ${DRINKS.length}, блюд ${FOODS.length}`;
 
   renderDatalist();
-  loadDay($('#date').value);
+  loadDay(dateEl ? dateEl.value : todayISO());
   if(state.rows.length===0) addEntry();
 
   // Таблица: ввод
@@ -527,7 +579,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     recalcTotals();
   });
 
-  // Удаление
+  // Удаление строки
   $('#tbl').addEventListener('click', (e)=>{
     const del = e.target.getAttribute && e.target.getAttribute('data-del');
     if(del!==null && del!==undefined){ state.rows.splice(+del,1); renderTable(); }
@@ -536,30 +588,33 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // Кнопки
   $('#saveDay').addEventListener('click', ()=>{ saveDay(); alert('Сохранено в этом браузере'); refreshViz(); });
   $('#clearDay').addEventListener('click', ()=>{ if(confirm('Очистить текущий день?')){ state.rows=[]; renderTable(); saveDay(); refreshViz(); } });
-  $('#clearAll').addEventListener('click', ()=>{ if(confirm('Точно стереть все записи?')){ localStorage.removeItem(STORE_KEY); loadDay($('#date').value); refreshViz(); } });
+  $('#clearAll').addEventListener('click', ()=>{ if(confirm('Точно стереть все записи?')){ localStorage.removeItem(STORE_KEY); loadDay($('#date')?.value || todayISO()); refreshViz(); } });
   $('#exportCsv').addEventListener('click', downloadCSV);
   $('#importCsv').addEventListener('change', (e)=>{
     const f = e.target.files?.[0]; if(!f) return;
     const r = new FileReader(); r.onload = ()=> { importCSV(String(r.result||'')); refreshViz(); }; r.readAsText(f, 'utf-8');
     e.target.value = '';
   });
-  $('#date').addEventListener('change', (e)=> { loadDay(e.target.value); refreshViz(); });
+
+  if(dateEl){
+    dateEl.addEventListener('change', (e)=> { loadDay(e.target.value); refreshViz(); });
+  }
 
   // Визуализация
   $('#period').addEventListener('change', refreshViz);
   $('#kcalGoal').addEventListener('change', ()=>{
-    const v = +$('#kcalGoal').value || 0; localStorage.setItem(GOAL_KEY, String(v)); refreshViz();
+    const v = +$('#kcalGoal').value || 0; localStorage.setItem(LIMIT_KEY, String(v)); refreshViz();
   });
 
-  // Штрих-код
+  // Штрих-коды
   $('#findBarcode').addEventListener('click', onFindBarcode);
   $('#scanCamera').addEventListener('click', startCameraScan);
   $('#closeCam').addEventListener('click', stopCameraScan);
+  // Кнопка "Фото штрих-кода"
+  $('#photoBtn').addEventListener('click', ()=> $('#barcodeImage').click());
   $('#barcodeImage').addEventListener('change', async (e)=>{ const f = e.target.files?.[0]; if(!f) return; await scanImageFile(f); e.target.value=''; });
 
-  // Первая отрисовка
+  // Первая отрисовка графиков + ресайз
   refreshViz();
-
-  // Ресайз графиков
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
