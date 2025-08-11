@@ -158,4 +158,63 @@ tfoot td{ font-weight:700; background:#101724; position:sticky; bottom:0 }
     grid-column: 1 / -1;
   }
 }
+/* ===== Мобильный вид: ≤600px ===== */
+@media (max-width: 600px){
+
+  /* Шапка: дата сверху, "Добавить строку" ниже — обе на 100% */
+  .app-header .row{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+  #date{ width:100%; }
+  #addEntryBtn{
+    width:100%;
+    text-align:center;
+    justify-self: stretch;
+  }
+
+  /* Блок штрих-кода: поле на 100%, кнопки столбиком на 100% и по центру текст */
+  /* оставляем .card .row гибким, но элементы задаём явно */
+  .card .row #barcode{
+    width:100%;
+  }
+  .card .row #findBarcode,
+  .card .row #scanCamera,
+  .card .row #photoBtn{
+    display:block;
+    width:100%;
+    text-align:center;
+  }
+  /* чтобы статус уходил на новую строку */
+  .card .row #lookupStatus{
+    display:block;
+    width:100%;
+    margin-top:4px;
+  }
+
+  /* Панель перед визуализацией: центрируем выбор периода и предел ккал */
+  #viz .row{
+    justify-content:center;
+  }
+  #viz .row .spacer{ display:none; }
+  #viz #period{
+    min-width: 160px;
+    text-align:center;
+  }
+  #viz .badge{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  #viz #kcalGoal{ width: 120px; }
+}
+
+/* Чуть шире телефонов: 601–900px — можно оставить в строку, но центрировать блок визуализации */
+@media (min-width: 601px) and (max-width: 900px){
+  #viz .row{ justify-content:center; }
+  #viz .row .spacer{ display:none; }
+}
+
 
