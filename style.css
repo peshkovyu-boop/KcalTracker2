@@ -62,7 +62,7 @@ tfoot td{ font-weight:700; background:#101724; position:sticky; bottom:0 }
 #camVideo{ width:100%; height:auto; display:block }
 #camCanvas{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none }
 
-/* ЗАКРЕПЛЁННАЯ ШАПКА */
+/* Закреплённая шапка */
 .app-header{
   position: sticky;
   top: 0;
@@ -70,98 +70,17 @@ tfoot td{ font-weight:700; background:#101724; position:sticky; bottom:0 }
   backdrop-filter: blur(6px);
 }
 
-/* Фото штрих-кода — как обычная синяя кнопка */
+/* Синяя кнопка "Фото штрих-кода" такого же вида */
 .photo-btn{
   background:linear-gradient(120deg,var(--acc),#5bb6ff);
   color:#001635; border:0; border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer;
   box-shadow:0 8px 20px rgba(77,163,255,.35);
 }
-/* === Адаптив: аккуратные кнопки/поля на мобильных === */
 
-/* Единый размер интерактивов */
-.app-header .row > *:is(button, label.badge, input, select),
-.card .row > *:is(button, label.badge, input, select),
-#actionsRow > * {
-  min-height: 44px;
-}
-
-/* Синяя кнопка «Фото штрих-кода» выравниваем с остальными */
-#photoBtn.photo-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Мобильная сетка: всё ровно и предсказуемо */
-@media (max-width: 600px){
-  /* Шапка: дата + Добавить строку — в 2 колонки */
-  .app-header .row{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    width: 100%;
-  }
-  .app-header .row #date{ grid-column: 1 / span 1; }
-  .app-header .row #addEntryBtn{ grid-column: 2 / span 1; width: 100%; }
-
-  /* Блок штрих-кода: поле — на всю ширину; кнопки — сеткой 2×N */
-  .card .row{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    width: 100%;
-  }
-  /* само поле штрих-кода тянется на всю строку */
-  .card .row #barcode{ grid-column: 1 / -1; width: 100%; }
-
-  /* кнопки поиска/сканирования — одинаковые и на всю ячейку */
-  .card .row #findBarcode,
-  .card .row #scanCamera,
-  .card .row #photoBtn,
-  .card .row .badge {
-    width: 100%;
-  }
-  /* статус мелким текстом — под сеткой */
-  .card .row #lookupStatus{
-    grid-column: 1 / -1;
-    margin-top: 2px;
-  }
-
-  /* Кнопки под таблицей — сеткой 2×N на всю ширину */
-  #actionsRow{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  #actionsRow > *{
-    width: 100%;
-    justify-self: stretch;
-    text-align: center;
-  }
-  /* Импорт (label.badge) — во всю строку */
-  #actionsRow .badge{
-    grid-column: 1 / -1;
-  }
-}
-
-/* Плотнее сетка на узких, но не совсем маленьких (600–900px) */
-@media (min-width: 601px) and (max-width: 900px){
-  .card .row, #actionsRow{
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-  .card .row #barcode{
-    grid-column: 1 / -1;
-  }
-  #actionsRow .badge{
-    grid-column: 1 / -1;
-  }
-}
-/* ===== Мобильный вид: ≤600px ===== */
+/* ==== Мобильный вид: кнопки в столбик, 100% ширины ==== */
 @media (max-width: 600px){
 
-  /* Шапка: дата сверху, "Добавить строку" ниже — обе на 100% */
+  /* Шапка: дата, затем "Добавить строку" — обе на 100% */
   .app-header .row{
     display: grid;
     grid-template-columns: 1fr;
@@ -169,52 +88,34 @@ tfoot td{ font-weight:700; background:#101724; position:sticky; bottom:0 }
     width: 100%;
   }
   #date{ width:100%; }
-  #addEntryBtn{
-    width:100%;
-    text-align:center;
-    justify-self: stretch;
-  }
+  #addEntryBtn{ width:100%; text-align:center; justify-self:stretch; }
 
-  /* Блок штрих-кода: поле на 100%, кнопки столбиком на 100% и по центру текст */
-  /* оставляем .card .row гибким, но элементы задаём явно */
-  .card .row #barcode{
-    width:100%;
-  }
-  .card .row #findBarcode,
-  .card .row #scanCamera,
-  .card .row #photoBtn{
+  /* Блок штрих-кода: поле, затем три кнопки — каждая на всю строку */
+  #barcode{ width:100%; }
+  #findBarcode,
+  #scanCamera,
+  #photoBtn{
     display:block;
     width:100%;
     text-align:center;
+    margin-bottom:10px;
   }
-  /* чтобы статус уходил на новую строку */
-  .card .row #lookupStatus{
-    display:block;
-    width:100%;
-    margin-top:4px;
-  }
+  #lookupStatus{ display:block; width:100%; margin-top:4px; }
 
-  /* Панель перед визуализацией: центрируем выбор периода и предел ккал */
+  /* Панель перед визуализациями — по центру */
   #viz .row{
     justify-content:center;
+    text-align:center;
+    gap:10px;
   }
   #viz .row .spacer{ display:none; }
-  #viz #period{
-    min-width: 160px;
-    text-align:center;
-  }
-  #viz .badge{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-  #viz #kcalGoal{ width: 120px; }
+  #viz #period{ min-width:160px; text-align:center; }
+  #viz .badge{ display:flex; align-items:center; justify-content:center; margin:0 auto; }
+  #viz #kcalGoal{ width:140px; text-align:center; }
 }
 
-/* Чуть шире телефонов: 601–900px — можно оставить в строку, но центрировать блок визуализации */
+/* Планшеты: центрируем панель перед графиками */
 @media (min-width: 601px) and (max-width: 900px){
   #viz .row{ justify-content:center; }
   #viz .row .spacer{ display:none; }
 }
-
-
