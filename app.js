@@ -296,15 +296,25 @@ function importCSV(text){
 // ========= ВИЗУАЛИЗАЦИИ (canvas) =========
 function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
 function rangeByKind(kind){
-  const end = startOfToday();
+  // выбранная дата из инпута, если есть
+  const selected = (document.querySelector('#date')?.value) || todayISO();
+
+  // конец периода: для "дня" — именно выбранная дата; для остального оставляем сегодня
+  if (kind === 'day') {
+    return [selected, selected];
+  }
+
+  const end = startOfToday();                 // как и было: «до сегодня»
   const start = new Date(end);
-  if(kind==='day') start.setDate(end.getDate());
-  if(kind==='week') start.setDate(end.getDate()-6);
-  if(kind==='month') start.setMonth(end.getMonth()-1);
-  if(kind==='year') start.setFullYear(end.getFullYear()-1);
-  const toISO = d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+  if (kind === 'week')  start.setDate(end.getDate() - 6);
+  if (kind === 'month') start.setMonth(end.getMonth() - 1);
+  if (kind === 'year')  start.setFullYear(end.getFullYear() - 1);
+
+  const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   return [toISO(start), toISO(end)];
 }
+
 function aggregateRange(kind){
   const [startISO, endISO] = rangeByKind(kind);
   const all = loadAll();
@@ -372,32 +382,67 @@ function drawGauge(cv, value, limit){
 // Пирог БЖУ (в цветах приложения) с подписями на секторах
 function drawPie(cv, kcalP, kcalF, kcalC){
   ensureCanvasSize(cv);
-  const ctx=cv.getContext('2d'); clearCanvas(cv);
-  const W=cv.width, H=cv.height; const cx=W/2, cy=H/2; const R=Math.min(W,H)*0.38;
+  const ctx = cv.getContext('2d'); clearCanvas(cv);
+
+  const W = cv.width, H = cv.height;
+  const cx = W/2, cy = H/2;
+  const R  = Math.min(W,H) * 0.38;
+
+  // Приглушённая палитра в стиле приложения
+  const colP = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#4da3ff'; // белки — синий
+  const colF = '#d75d5d';   // жиры — приглушённый красный (родство с --warn)
+  const colC = '#5a7d9a';   // углеводы — спокойный серо-голубой
+
+  // Лёгкие градиенты для глубины
+  function grad(color){
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, color);
+    g.addColorStop(1, '#1a2332'); // лёгкое затемнение к краю
+    return g;
+  }
+
   const parts = [
-    {v:kcalP, color:'#7ddc82', label:'Белки'},   // зелёный
-    {v:kcalF, color:'#ff9f5f', label:'Жиры'},    // оранжевый
-    {v:kcalC, color:'#4da3ff', label:'Углев'}    // синий
+    { v: Math.max(0, +kcalP || 0), color: grad(colP), label:'Б' },
+    { v: Math.max(0, +kcalF || 0), color: grad(colF), label:'Ж' },
+    { v: Math.max(0, +kcalC || 0), color: grad(colC), label:'У' },
   ];
-  const total = parts.reduce((s,p)=>s+(+p.v||0),0) || 1;
+  const total = parts.reduce((s,p)=>s+p.v,0) || 1;
+
+  // Тень под пирог
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.35)';
+  ctx.shadowBlur = Math.max(8, R*0.12);
+  ctx.shadowOffsetY = Math.max(4, R*0.06);
+
   let a0 = -Math.PI/2;
-  ctx.textAlign='center'; ctx.textBaseline='middle';
   parts.forEach(p=>{
     const a = (p.v/total)*Math.PI*2;
+
     // сектор
     ctx.beginPath(); ctx.moveTo(cx,cy);
-    ctx.fillStyle=p.color; ctx.arc(cx,cy,R,a0,a0+a); ctx.closePath(); ctx.fill();
-    // подпись
+    ctx.fillStyle = p.color;
+    ctx.arc(cx,cy,R,a0,a0+a); ctx.closePath(); ctx.fill();
+
+    // тонкая разделительная линия
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
+    ctx.lineWidth = Math.max(1, R*0.02);
+    ctx.beginPath(); ctx.arc(cx,cy,R, a0, a0+a); ctx.stroke();
+
+    // буква прямо на секторе
     const mid = a0 + a/2;
-    const rx = cx + Math.cos(mid) * R*0.6;
-    const ry = cy + Math.sin(mid) * R*0.6;
-    ctx.fillStyle='#0b0f14';
-    ctx.font = `${Math.max(12, Math.round(R*0.16))}px system-ui`;
-    const percent = Math.round((p.v/total)*100);
-    ctx.fillText(`${p.label} ${percent}%`, rx, ry);
+    const rx = cx + Math.cos(mid) * R*0.58;
+    const ry = cy + Math.sin(mid) * R*0.58;
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = `${Math.max(14, Math.round(R*0.22))}px system-ui`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.label, rx, ry);
+
     a0 += a;
   });
+
+  ctx.restore();
 }
+
 
 // Линия тренда (ккал по дням)
 function drawTrend(cv, points){
@@ -636,5 +681,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
+
 
 
