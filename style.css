@@ -119,3 +119,22 @@ tfoot td{ font-weight:700; background:#101724; position:sticky; bottom:0 }
   #viz .row{ justify-content:center; }
   #viz .row .spacer{ display:none; }
 }
+/* Ровный блок действий под таблицей (только он) */
+@media (max-width: 600px){
+  #actionsRow{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  #actionsRow > *{
+    width: 100%;
+    justify-self: stretch;
+    text-align: center;
+    margin: 0;            /* убираем случайные внешние отступы */
+  }
+  /* Импорт CSV — на всю ширину строки между верхним и нижним рядом */
+  #actionsRow .badge{
+    grid-column: 1 / -1;
+  }
+}
+
