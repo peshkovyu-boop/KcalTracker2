@@ -76,3 +76,86 @@ tfoot td{ font-weight:700; background:#101724; position:sticky; bottom:0 }
   color:#001635; border:0; border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer;
   box-shadow:0 8px 20px rgba(77,163,255,.35);
 }
+/* === Адаптив: аккуратные кнопки/поля на мобильных === */
+
+/* Единый размер интерактивов */
+.app-header .row > *:is(button, label.badge, input, select),
+.card .row > *:is(button, label.badge, input, select),
+#actionsRow > * {
+  min-height: 44px;
+}
+
+/* Синяя кнопка «Фото штрих-кода» выравниваем с остальными */
+#photoBtn.photo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Мобильная сетка: всё ровно и предсказуемо */
+@media (max-width: 600px){
+  /* Шапка: дата + Добавить строку — в 2 колонки */
+  .app-header .row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+  .app-header .row #date{ grid-column: 1 / span 1; }
+  .app-header .row #addEntryBtn{ grid-column: 2 / span 1; width: 100%; }
+
+  /* Блок штрих-кода: поле — на всю ширину; кнопки — сеткой 2×N */
+  .card .row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+  /* само поле штрих-кода тянется на всю строку */
+  .card .row #barcode{ grid-column: 1 / -1; width: 100%; }
+
+  /* кнопки поиска/сканирования — одинаковые и на всю ячейку */
+  .card .row #findBarcode,
+  .card .row #scanCamera,
+  .card .row #photoBtn,
+  .card .row .badge {
+    width: 100%;
+  }
+  /* статус мелким текстом — под сеткой */
+  .card .row #lookupStatus{
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+
+  /* Кнопки под таблицей — сеткой 2×N на всю ширину */
+  #actionsRow{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  #actionsRow > *{
+    width: 100%;
+    justify-self: stretch;
+    text-align: center;
+  }
+  /* Импорт (label.badge) — во всю строку */
+  #actionsRow .badge{
+    grid-column: 1 / -1;
+  }
+}
+
+/* Плотнее сетка на узких, но не совсем маленьких (600–900px) */
+@media (min-width: 601px) and (max-width: 900px){
+  .card .row, #actionsRow{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .card .row #barcode{
+    grid-column: 1 / -1;
+  }
+  #actionsRow .badge{
+    grid-column: 1 / -1;
+  }
+}
+
