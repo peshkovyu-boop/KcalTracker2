@@ -321,7 +321,8 @@ function aggregateRange(kind){
     cur.setDate(cur.getDate()+1);
   }
   const total = days.reduce((a,d)=>({kcal:a.kcal+d.kcal, p:a.p+d.p, f:a.f+d.f, c:a.c+d.c}), {kcal:0,p:0,f:0,c:0});
-  return { total, days, startISO, endISO };
+  const daysCount = days.length; // <-- важное: кол-во дней в выбранном периоде
+  return { total, days, startISO, endISO, daysCount };
 }
 function clearCanvas(cv){ const ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height); }
 function ensureCanvasSize(cv){
@@ -420,13 +421,26 @@ function drawTrend(cv, points){
 function refreshViz(){
   try{
     const kind = $('#period')?.value || 'day';
-    const { total, days } = aggregateRange(kind);
-    const cv1 = $('#kpiGauge'); const cv2 = $('#pieMacros'); const cv3 = $('#trendDaily');
-    const limit = +(localStorage.getItem(LIMIT_KEY)||'0') || 0;
-    const inp = $('#kcalGoal'); if(inp) inp.value = limit || '';
-    if(cv1) drawGauge(cv1, total.kcal, limit);
-    if(cv2){ const kcalP = total.p*4, kcalF = total.f*9, kcalC = total.c*4; drawPie(cv2, kcalP, kcalF, kcalC); }
-    if(cv3) drawTrend(cv3, days.map(d=>({label:d.date, value:d.kcal})));
+    const { total, days, daysCount } = aggregateRange(kind);
+
+    const cv1 = $('#kpiGauge');
+    const cv2 = $('#pieMacros');
+    const cv3 = $('#trendDaily');
+
+    // дневной лимит из поля (храним как «за день»)
+    const dailyLimit = +(localStorage.getItem(LIMIT_KEY)||'0') || 0;
+    const inp = $('#kcalGoal'); 
+    if (inp) inp.value = dailyLimit || '';
+
+    // масштабируем лимит под период: день×1, неделя×7, месяц×N, год×N
+    const periodLimit = dailyLimit * (daysCount || 1);
+
+    if (cv1) drawGauge(cv1, total.kcal, periodLimit);
+    if (cv2){
+      const kcalP = total.p*4, kcalF = total.f*9, kcalC = total.c*4;
+      drawPie(cv2, kcalP, kcalF, kcalC);
+    }
+    if (cv3) drawTrend(cv3, days.map(d=>({label:d.date, value:d.kcal})));
   }catch(e){ console.warn('viz error', e); }
 }
 
@@ -618,3 +632,4 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
+
