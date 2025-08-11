@@ -311,19 +311,23 @@ function aggregateRange(kind){
   const days = [];
   const cur = new Date(startISO);
   const end = new Date(endISO);
-  while(cur <= end){
+
+  while (cur <= end) {
     const dISO = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
     const arr = all[dISO] || [];
     const sums = arr.reduce((a,r)=>({
       kcal:a.kcal+(+r.kcal||0), p:a.p+(+r.p||0), f:a.f+(+r.f||0), c:a.c+(+r.c||0)
     }), {kcal:0,p:0,f:0,c:0});
-    days.push({date:dISO, ...sums});
+    days.push({date:dISO, ...sums, count:arr.length});
     cur.setDate(cur.getDate()+1);
   }
+
   const total = days.reduce((a,d)=>({kcal:a.kcal+d.kcal, p:a.p+d.p, f:a.f+d.f, c:a.c+d.c}), {kcal:0,p:0,f:0,c:0});
-  const daysCount = days.length; // <-- важное: кол-во дней в выбранном периоде
-  return { total, days, startISO, endISO, daysCount };
+  const daysCount = days.length;
+  const filledDays = days.filter(d => d.count>0).length; // считаем только реально заполненные
+  return { total, days, startISO, endISO, daysCount, filledDays };
 }
+
 function clearCanvas(cv){ const ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height); }
 function ensureCanvasSize(cv){
   const r=cv.getBoundingClientRect();
@@ -421,19 +425,18 @@ function drawTrend(cv, points){
 function refreshViz(){
   try{
     const kind = $('#period')?.value || 'day';
-    const { total, days, daysCount } = aggregateRange(kind);
+    const { total, days, filledDays } = aggregateRange(kind);
 
     const cv1 = $('#kpiGauge');
     const cv2 = $('#pieMacros');
     const cv3 = $('#trendDaily');
 
-    // дневной лимит из поля (храним как «за день»)
     const dailyLimit = +(localStorage.getItem(LIMIT_KEY)||'0') || 0;
-    const inp = $('#kcalGoal'); 
-    if (inp) inp.value = dailyLimit || '';
+    const inp = $('#kcalGoal'); if (inp) inp.value = dailyLimit || '';
 
-    // масштабируем лимит под период: день×1, неделя×7, месяц×N, год×N
-    const periodLimit = dailyLimit * (daysCount || 1);
+    // Для дня = 1, для остальных — число реально заполненных дней (минимум 1, чтобы шкала не была нулевой)
+    const effectiveDays = (kind === 'day') ? 1 : Math.max(1, filledDays);
+    const periodLimit = dailyLimit * effectiveDays;
 
     if (cv1) drawGauge(cv1, total.kcal, periodLimit);
     if (cv2){
@@ -443,6 +446,7 @@ function refreshViz(){
     if (cv3) drawTrend(cv3, days.map(d=>({label:d.date, value:d.kcal})));
   }catch(e){ console.warn('viz error', e); }
 }
+
 
 // ========= ВВОД/ПОИСК =========
 let debounceTimer = null;
@@ -632,4 +636,5 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
+
 
