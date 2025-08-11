@@ -137,4 +137,20 @@ tfoot td{ font-weight:700; background:#101724; position:sticky; bottom:0 }
     grid-column: 1 / -1;
   }
 }
+/* Шапка менее прозрачная + кнопка заметнее */
+.app-header{
+  background: rgba(18,24,35,0.92);           /* было слишком прозрачно */
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+}
+.app-header #addEntryBtn{
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(120deg,#3b93ef,#5bb6ff); /* чуть насыщеннее синяя */
+  box-shadow: 0 8px 20px rgba(77,163,255,.40);
+}
+
+/* Цвет текста у кнопок под таблицей */
+#saveDay{  color: var(--acc) !important;  }  /* синий текст */
+#clearDay{ color: var(--warn) !important; }  /* красный текст */
+
 
