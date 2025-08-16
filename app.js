@@ -680,19 +680,49 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   });
 
   // Кнопки
-  $('#saveDay').addEventListener('click', ()=>{ saveDay(); alert('Сохранено в этом браузере'); refreshViz(); });
-  $('#clearDay').addEventListener('click', ()=>{ if(confirm('Очистить текущий день?')){ state.rows=[]; renderTable(); saveDay(); refreshViz(); } });
-  $('#clearAll').addEventListener('click', ()=>{ if(confirm('Точно стереть все записи?')){ localStorage.removeItem(STORE_KEY); loadDay($('#date')?.value || todayISO()); refreshViz(); } });
-  $('#exportCsv').addEventListener('click', downloadCSV);
-  $('#importCsv').addEventListener('change', (e)=>{
-    const f = e.target.files?.[0]; if(!f) return;
-    const r = new FileReader(); r.onload = ()=> { importCSV(String(r.result||'')); refreshViz(); }; r.readAsText(f, 'utf-8');
-    e.target.value = '';
-  });
+$('#saveDay').addEventListener('click', ()=>{ 
+  saveDay(); 
+  alert('Сохранено в этом браузере'); 
+  refreshViz(); 
+});
+$('#clearDay').addEventListener('click', ()=>{ 
+  if(confirm('Очистить текущий день?')){ 
+    state.rows=[]; 
+    renderTable(); 
+    saveDay(); 
+    refreshViz(); 
+  } 
+});
+$('#clearAll').addEventListener('click', ()=>{ 
+  if(confirm('Точно стереть все записи?')){ 
+    localStorage.removeItem(STORE_KEY); 
+    loadDay($('#date')?.value || todayISO()); 
+    refreshViz(); 
+  } 
+});
+$('#exportCsv').addEventListener('click', downloadCSV);
+$('#importCsv').addEventListener('change', (e)=>{
+  const f = e.target.files?.[0]; 
+  if(!f) return;
+  const r = new FileReader(); 
+  r.onload = ()=> { 
+    importCSV(String(r.result||'')); 
+    refreshViz(); 
+  }; 
+  r.readAsText(f, 'utf-8');
+  e.target.value = '';
+});
 
-  if(dateEl){
-    dateEl.addEventListener('change', (e)=> { loadDay(e.target.value); refreshViz(); });
-  }
+// ✅ Новая подписка
+$('#updateApp')?.addEventListener('click', window.forceUpdateApp);
+
+if(dateEl){
+  dateEl.addEventListener('change', (e)=> { 
+    loadDay(e.target.value); 
+    refreshViz(); 
+  });
+}
+
 
   // Визуализация
   $('#period').addEventListener('change', refreshViz);
@@ -724,6 +754,7 @@ window.forceUpdateApp = async function(){
     location.reload();
   }
 };
+
 
 
 
