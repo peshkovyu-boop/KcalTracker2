@@ -40,16 +40,20 @@ if ('serviceWorker' in navigator) {
 let DRINKS = [], DRINKS_BY_CODE = new Map();
 let FOODS = [], FOODS_BY_NAME = new Map();
 
-async function safeFetchJSON(path){
-  try{
-    const r = await fetch(path, { cache: 'no-cache' });
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    return await r.json();
-  }catch(e){
+async function safeFetchJSON(path) {
+  try {
+    // к каждому JSON-URL добавляем уникальный параметр, чтобы обойти кэш
+    const sep = path.includes('?') ? '&' : '?';
+    const url = `${path}${sep}cb=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
     console.warn('fetch JSON fail', path, e);
     return null;
   }
 }
+
 async function loadDrinks(){
   const list = await safeFetchJSON('/drinks.json');
   if(Array.isArray(list)){
@@ -60,11 +64,15 @@ async function loadDrinks(){
 }
 async function loadFoods(){
   const list = await safeFetchJSON('/foods.json');
-  if(Array.isArray(list)){
+  if (Array.isArray(list)) {
     FOODS = list;
     FOODS_BY_NAME = new Map(list.map(it => [it.name.toLowerCase(), it]));
-  } else { FOODS=[]; FOODS_BY_NAME=new Map(); }
+  } else {
+    FOODS = [];
+    FOODS_BY_NAME = new Map();
+  }
 }
+
 
 // ========= Open Food Facts =========
 function extractNutrients(p){
@@ -710,6 +718,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
+
 
 
 
