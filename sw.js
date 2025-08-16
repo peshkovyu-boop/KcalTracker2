@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calctracker-cache-v35'; // ↑ меняй номер при каждом апдейте
+const CACHE_NAME = 'calctracker-cache-v36'; // ↑ меняй номер при каждом апдейте
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -43,5 +43,6 @@ self.addEventListener('fetch', (event) => {
     return cached || network || fetch(request);
   })());
 });
+
 
 
