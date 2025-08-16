@@ -1,62 +1,45 @@
-const CACHE_NAME = 'calctracker-cache-v31';
-const PRECACHE = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.webmanifest',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
-];
-const isOFF = (url) => url.hostname.endsWith('openfoodfacts.org') || url.hostname.endsWith('openfoodfacts.net');
+const CACHE_NAME = 'calctracker-cache-v33'; // ↑ меняй номер при каждом апдейте
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
 });
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
-    .then(() => self.clients.claim())
-  );
-});
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
 
-  if (url.origin === self.location.origin) {
-    // наши файлы — cache-first
-    e.respondWith(
-      caches.match(req).then(c => c || fetch(req).then(res => {
-        const copy = res.clone(); caches.open(CACHE_NAME).then(cache => cache.put(req, copy)); return res;
-      }))
-    );
-  } else if (isOFF(url) || url.hostname.includes('unpkg.com') || url.hostname.includes('zxing')) {
-    // внешние — network-first
-    e.respondWith((async () => {
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+// fetch обработчик
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // === для JSON всегда пробуем сеть, иначе fallback на кэш ===
+  if (url.pathname.endsWith('.json')) {
+    event.respondWith((async () => {
       try {
-        const fresh = await fetch(req);
-        caches.open(CACHE_NAME).then(c => c.put(req, fresh.clone()));
+        // force no-cache
+        const fresh = await fetch(request, { cache: 'no-store' });
         return fresh;
       } catch {
-        const cached = await caches.match(req);
-        return cached || new Response('', { status: 502, statusText: 'Offline' });
+        // если оффлайн и сеть не дала, берём кэш
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        throw new Error('offline and no cache');
       }
     })());
+    return;
   }
+
+  // === для остальных файлов обычный stale-while-revalidate ===
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+
+    const network = fetch(request).then(res => {
+      cache.put(request, res.clone());
+      return res;
+    }).catch(() => null);
+
+    return cached || network || fetch(request);
+  })());
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
