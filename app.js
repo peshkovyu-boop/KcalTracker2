@@ -2,6 +2,7 @@
 const STORE_KEY = 'calctracker:v13';
 const CACHE_KEY = 'calctracker:offCache:v6';
 const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал"
+const APP_VERSION = '2025-08-11-01'; // меняй при каждом деплое
 
 // ========= МИНИ-БАЗА (подстраховка, на 100 г) =========
 const FOOD_DB = [
@@ -42,7 +43,8 @@ let FOODS = [], FOODS_BY_NAME = new Map();
 
 async function safeFetchJSON(path){
   try{
-    const r = await fetch(path, { cache: 'no-cache' });
+    const url = `${path}?v=${encodeURIComponent(APP_VERSION)}`;
+    const r = await fetch(url, { cache: 'no-store' });
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
   }catch(e){
@@ -710,6 +712,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
+
 
 
 
