@@ -2,7 +2,7 @@
 const STORE_KEY = 'calctracker:v13';
 const CACHE_KEY = 'calctracker:offCache:v6';
 const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал"
-const APP_VERSION = '2025-08-11-02'; // меняй при каждом деплое
+const APP_VERSION = '2025-08-11-03'; // меняй при каждом деплое
 
 // ========= МИНИ-БАЗА (подстраховка, на 100 г) =========
 const FOOD_DB = [
@@ -754,6 +754,7 @@ window.forceUpdateApp = async function(){
     location.reload();
   }
 };
+
 
 
 
