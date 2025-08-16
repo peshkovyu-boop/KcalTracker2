@@ -2,7 +2,6 @@
 const STORE_KEY = 'calctracker:v13';
 const CACHE_KEY = 'calctracker:offCache:v6';
 const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал"
-const APP_VERSION = '2025-08-11-03'; // меняй при каждом деплое
 
 // ========= МИНИ-БАЗА (подстраховка, на 100 г) =========
 const FOOD_DB = [
@@ -43,8 +42,7 @@ let FOODS = [], FOODS_BY_NAME = new Map();
 
 async function safeFetchJSON(path){
   try{
-    const url = `${path}?v=${encodeURIComponent(APP_VERSION)}`;
-    const r = await fetch(url, { cache: 'no-store' });
+    const r = await fetch(path, { cache: 'no-cache' });
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
   }catch(e){
@@ -680,49 +678,19 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   });
 
   // Кнопки
-$('#saveDay').addEventListener('click', ()=>{ 
-  saveDay(); 
-  alert('Сохранено в этом браузере'); 
-  refreshViz(); 
-});
-$('#clearDay').addEventListener('click', ()=>{ 
-  if(confirm('Очистить текущий день?')){ 
-    state.rows=[]; 
-    renderTable(); 
-    saveDay(); 
-    refreshViz(); 
-  } 
-});
-$('#clearAll').addEventListener('click', ()=>{ 
-  if(confirm('Точно стереть все записи?')){ 
-    localStorage.removeItem(STORE_KEY); 
-    loadDay($('#date')?.value || todayISO()); 
-    refreshViz(); 
-  } 
-});
-$('#exportCsv').addEventListener('click', downloadCSV);
-$('#importCsv').addEventListener('change', (e)=>{
-  const f = e.target.files?.[0]; 
-  if(!f) return;
-  const r = new FileReader(); 
-  r.onload = ()=> { 
-    importCSV(String(r.result||'')); 
-    refreshViz(); 
-  }; 
-  r.readAsText(f, 'utf-8');
-  e.target.value = '';
-});
-
-// ✅ Новая подписка
-$('#updateApp')?.addEventListener('click', window.forceUpdateApp);
-
-if(dateEl){
-  dateEl.addEventListener('change', (e)=> { 
-    loadDay(e.target.value); 
-    refreshViz(); 
+  $('#saveDay').addEventListener('click', ()=>{ saveDay(); alert('Сохранено в этом браузере'); refreshViz(); });
+  $('#clearDay').addEventListener('click', ()=>{ if(confirm('Очистить текущий день?')){ state.rows=[]; renderTable(); saveDay(); refreshViz(); } });
+  $('#clearAll').addEventListener('click', ()=>{ if(confirm('Точно стереть все записи?')){ localStorage.removeItem(STORE_KEY); loadDay($('#date')?.value || todayISO()); refreshViz(); } });
+  $('#exportCsv').addEventListener('click', downloadCSV);
+  $('#importCsv').addEventListener('change', (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    const r = new FileReader(); r.onload = ()=> { importCSV(String(r.result||'')); refreshViz(); }; r.readAsText(f, 'utf-8');
+    e.target.value = '';
   });
-}
 
+  if(dateEl){
+    dateEl.addEventListener('change', (e)=> { loadDay(e.target.value); refreshViz(); });
+  }
 
   // Визуализация
   $('#period').addEventListener('change', refreshViz);
@@ -742,24 +710,6 @@ if(dateEl){
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
-
-// Кнопка обновления базы
-window.forceUpdateApp = async function(){
-  try{
-    const regs = await navigator.serviceWorker.getRegistrations();
-    for (const r of regs) await r.update();
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => caches.delete(k)));
-  } finally {
-    location.reload();
-  }
-};
-
-
-
-
-
-
 
 
 
