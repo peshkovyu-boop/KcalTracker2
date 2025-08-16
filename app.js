@@ -713,6 +713,20 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
 
+// Кнопка обновления базы
+window.forceUpdateApp = async function(){
+  try{
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const r of regs) await r.update();
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  } finally {
+    location.reload();
+  }
+};
+
+
+
 
 
 
