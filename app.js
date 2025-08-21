@@ -2,7 +2,7 @@
 const STORE_KEY = 'calctracker:v13';
 const CACHE_KEY = 'calctracker:offCache:v6';
 const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал";
-const AI_WORKER_URL = 'https://red-resonance-f66e.peshkov-yu.workers.dev/'
+const AI_WORKER_URL = 'https://red-resonance-f66e.peshkov-yu.workers.dev'
 
 
 // ========= МИНИ-БАЗА (подстраховка, на 100 г) =========
@@ -763,6 +763,7 @@ async function analyzeDishPhotoUSDA(file){
     if (st) st.textContent = 'Ошибка ИИ: ' + (e.message||'');
   }
 }
+
 
 
 
