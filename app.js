@@ -1,7 +1,9 @@
 // ========= КЛЮЧИ/КОНСТАНТЫ =========
 const STORE_KEY = 'calctracker:v13';
 const CACHE_KEY = 'calctracker:offCache:v6';
-const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал"
+const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал";
+const AI_WORKER_URL = 'https://red-resonance-f66e.peshkov-yu.workers.dev/'
+
 
 // ========= МИНИ-БАЗА (подстраховка, на 100 г) =========
 const FOOD_DB = [
@@ -663,6 +665,16 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   loadDay(dateEl ? dateEl.value : todayISO());
   if(state.rows.length===0) addEntry();
 
+  document.querySelector('#aiPhotoBtn')?.addEventListener('click', ()=> 
+  document.querySelector('#aiPhotoInput').click()
+);
+document.querySelector('#aiPhotoInput')?.addEventListener('change', async (e)=>{
+  const f = e.target.files?.[0]; if(!f) return;
+  await analyzeDishPhotoUSDA(f);
+  e.target.value = '';
+});
+
+
   // Таблица: ввод
   $('#tbl').addEventListener('input', async (e)=>{
     const tr = e.target.closest('tr'); if(!tr) return;
@@ -718,6 +730,40 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   refreshViz();
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
+
+// ИИ по фото
+async function analyzeDishPhotoUSDA(file){
+  const st = document.querySelector('#aiStatus'); 
+  if (st) st.textContent = 'Отправляю фото...';
+
+  const form = new FormData();
+  form.append('image', file, file.name || 'photo.jpg');
+
+  try{
+    const r = await fetch(`${AI_WORKER_URL}/ai/food`, { method:'POST', body: form });
+    if(!r.ok){ throw new Error(`HTTP ${r.status}`); }
+    const data = await r.json();
+    const items = Array.isArray(data?.items) ? data.items : [];
+    if (!items.length){ if(st) st.textContent = 'Не удалось распознать блюдо'; return; }
+
+    // Берём 1-й вариант, добавляем строку (перенести в UI — легко)
+    const best = items[0];
+    addEntry();
+    const i = state.rows.length-1;
+
+    state.rows[i].product = best.name;                      // человекочитаемое имя
+    state.rows[i]._per100 = { ...best.per100 };             // КБЖУ на 100 г
+    state.rows[i].source  = { type:'ai-usda', match:best.match };
+
+    const tr = document.querySelector('#tbl tbody').children[i];
+    tr.querySelector('input[data-k="product"]').value = best.name;
+
+    if (st) st.textContent = `Найдено: ${best.name} (на 100 г). Введи вес.`;
+  }catch(e){
+    if (st) st.textContent = 'Ошибка ИИ: ' + (e.message||'');
+  }
+}
+
 
 
 
