@@ -739,7 +739,7 @@ async function analyzeDishPhotoUSDA(file){
   const form = new FormData();
   form.append('image', file, file.name || 'photo.jpg');
 
-  const endpoint = `${AI_WORKER_URL.replace(/\/+$/,'')}/ai/food`; // на всякий
+  const endpoint = `${AI_WORKER_URL.replace(/\/+$/,'')}/ai/food?debug=1`; // на всякий
 
   try{
     const r = await fetch(endpoint, { method:'POST', body: form });
@@ -767,6 +767,7 @@ async function analyzeDishPhotoUSDA(file){
     console.warn('AI endpoint:', endpoint);
   }
 }
+
 
 
 
