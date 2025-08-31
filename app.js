@@ -74,6 +74,7 @@ async function loadFoods(){
   }
 }
 
+
 // ========= Open Food Facts =========
 function extractNutrients(p){
   if(!p || !p.nutriments) return null;
@@ -387,7 +388,7 @@ function drawGauge(cv, value, limit){
   }
 }
 
-// Пирог БЖУ (в цветах приложения) с подписями на секторах
+// Пирог БЖУ
 function drawPie(cv, kcalP, kcalF, kcalC){
   ensureCanvasSize(cv);
   const ctx = cv.getContext('2d'); clearCanvas(cv);
@@ -396,10 +397,9 @@ function drawPie(cv, kcalP, kcalF, kcalC){
   const cx = W/2, cy = H/2;
   const R  = Math.min(W,H) * 0.38;
 
-  // Спокойная палитра
-  const colP = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#4da3ff'; // Б (синий)
-  const colF = '#d75d5d';   // Ж (приглушённый красный)
-  const colC = '#5a7d9a';   // У (серо-голубой)
+  const colP = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#4da3ff';
+  const colF = '#d75d5d';
+  const colC = '#5a7d9a';
 
   const parts = [
     { v: Math.max(0, +kcalP || 0), color: colP, label:'Б' },
@@ -408,7 +408,6 @@ function drawPie(cv, kcalP, kcalF, kcalC){
   ];
   const total = parts.reduce((s,p)=>s+p.v,0);
   if (total <= 0){
-    // Пустой круг с тонкой окружностью
     ctx.strokeStyle = 'rgba(255,255,255,.12)';
     ctx.lineWidth = Math.max(2, R*0.06);
     ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
@@ -419,7 +418,6 @@ function drawPie(cv, kcalP, kcalF, kcalC){
     return;
   }
 
-  // Рисуем сектора (строго минимализм)
   let a0 = -Math.PI/2;
   parts.forEach(p=>{
     const a = (p.v/total)*Math.PI*2;
@@ -429,7 +427,6 @@ function drawPie(cv, kcalP, kcalF, kcalC){
     a0 += a;
   });
 
-  // Тонкие разделители
   ctx.strokeStyle = 'rgba(255,255,255,.08)';
   ctx.lineWidth = Math.max(1, R*0.02);
   a0 = -Math.PI/2;
@@ -439,7 +436,6 @@ function drawPie(cv, kcalP, kcalF, kcalC){
     a0 += a;
   });
 
-  // Подписи на/у сектора: «Б 34%», «Ж 28%», «У 38%»
   ctx.fillStyle = '#e6edf3';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -451,7 +447,6 @@ function drawPie(cv, kcalP, kcalF, kcalC){
     const mid = a0 + a/2;
     const percent = Math.round((p.v/total)*100);
 
-    // Если сектор маленький (<8%), выносим подпись наружу с короткой линейкой
     if (percent < 8) {
       const r1 = R*0.78, r2 = R*0.94;
       const x1 = cx + Math.cos(mid)*r1;
@@ -468,7 +463,6 @@ function drawPie(cv, kcalP, kcalF, kcalC){
       ctx.textAlign = (Math.cos(mid) >= 0) ? 'left' : 'right';
       ctx.fillText(`${p.label} ${percent}%`, outsideX, outsideY);
     } else {
-      // Внутри сектора
       const rx = cx + Math.cos(mid) * R*0.58;
       const ry = cy + Math.sin(mid) * R*0.58;
       ctx.font = `${baseFont}px system-ui`;
@@ -486,17 +480,14 @@ function drawTrend(cv, points){
   const ctx=cv.getContext('2d'); clearCanvas(cv);
   const W=cv.width, H=cv.height; const pad=36; const w=W-pad*2; const h=H-pad*2;
   const maxVal = Math.max(1, ...points.map(p=>p.value));
-  // оси
   ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.beginPath();
   ctx.moveTo(pad, H-pad); ctx.lineTo(W-pad, H-pad); ctx.moveTo(pad, pad); ctx.lineTo(pad, H-pad); ctx.stroke();
-  // линия
   ctx.beginPath(); ctx.strokeStyle='#4da3ff'; ctx.lineWidth=2;
   points.forEach((p,i)=>{
     const x = pad + (w * (i/(Math.max(1,points.length-1))));
     const y = H - pad - (h * (p.value/maxVal));
     if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   }); ctx.stroke();
-  // подписи дат снизу
   ctx.fillStyle='#c5d0db'; ctx.font='11px system-ui';
   points.forEach((p,i)=>{
     const x = pad + (w * (i/(Math.max(1,points.length-1)))); const y = H - pad + 14;
@@ -515,7 +506,6 @@ function refreshViz(){
     const dailyLimit = +(localStorage.getItem(LIMIT_KEY)||'0') || 0;
     const inp = $('#kcalGoal'); if (inp) inp.value = dailyLimit || '';
 
-    // Для дня = 1, для остальных — число реально заполненных дней (минимум 1, чтобы шкала не была нулевой)
     const effectiveDays = (kind === 'day') ? 1 : Math.max(1, filledDays);
     const periodLimit = dailyLimit * effectiveDays;
 
@@ -727,6 +717,46 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
 
+/* ===================== ИИ ПО ФОТО: несколько строк, дедупликация ===================== */
+
+// синонимы и нормализация лейблов от ИИ
+function normalizeFoodLabel(s){
+  let x = String(s||'').trim().toLowerCase();
+  if(!x) return '';
+  const syn = {
+    'wrap':'tortilla','flatbread':'tortilla','lavash':'tortilla','лаваш':'tortilla',
+    'meat':'beef','beef meat':'beef','red meat':'beef','мясо':'beef',
+    'chicken meat':'chicken','poultry':'chicken','курица':'chicken',
+    'sauce':'sauce','соус':'sauce'
+  };
+  if(syn[x]) x = syn[x];
+  // убрать совсем слишком общие слова-наполнители — оставим если это единственное
+  if (['sauce'].includes(x)) return ''; 
+  return x;
+}
+
+// канонический ключ для удаления дублей (срезаем бренды/уточнения)
+function canonicalKey(name){
+  let s = String(name||'').toLowerCase();
+  s = s.split('•')[0];
+  s = s.split(' - ')[0];
+  s = s.replace(/\(.*?\)/g,'');
+  s = s.replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
+  // взять первые 2 слова как ключ
+  s = s.split(' ').slice(0, 2).join(' ');
+  return s;
+}
+
+// выбрать лучший OFF-хит под конкретный кандидат
+function bestOffHit(list, cand){
+  const c = String(cand||'').toLowerCase();
+  // 1) сначала те, где в названии есть cand
+  const withInc = list.filter(x => String(x.name||'').toLowerCase().includes(c));
+  if (withInc.length) return withInc[0];
+  // 2) иначе — просто первый валидный
+  return list[0] || null;
+}
+
 // === ИИ по фото: добавляем строки для КАЖДОГО найденного блюда ===
 async function analyzeDishPhoto(file){
   const st = document.querySelector('#aiStatus'); 
@@ -746,49 +776,67 @@ async function analyzeDishPhoto(file){
       throw new Error(`HTTP ${r.status} ${r.statusText||''} | ${tt.slice(0,200)}`);
     }
     const data = await r.json();
-    const labels = (data && data.parsed && Array.isArray(data.parsed.items)) ? data.parsed.items : [];
+    const rawLabels = (data && data.parsed && Array.isArray(data.parsed.items)) ? data.parsed.items : [];
 
-    if (!labels.length){
+    if (!rawLabels.length){
       if (st) st.textContent = 'Не удалось распознать блюдо';
       return;
     }
 
-    // 2) готовим список кандидатов: en и ru, уберём дубли/длину
+    // 2) готовим список кандидатов (en и ru), нормализуем и убираем дубли
     const candSet = new Set();
-    for (const it of labels) {
-      const a = String(it.en||'').trim();
-      const b = String(it.ru||'').trim();
+    for (const it of rawLabels) {
+      const a = normalizeFoodLabel(it.en);
+      const b = normalizeFoodLabel(it.ru);
       if (a && a.length <= 40) candSet.add(a);
       if (b && b.length <= 40) candSet.add(b);
     }
-    const candidates = Array.from(candSet).slice(0, 10);
+    let candidates = Array.from(candSet);
+    if (!candidates.length){
+      if (st) st.textContent = 'Нашёл по фото, но метки слишком общие';
+      return;
+    }
     if (st) st.textContent = `Нашёл по фото: ${candidates.join(', ')} — ищу КБЖУ...`;
 
-    // 3) для КАЖДОГО кандидата пробуем USDA, затем OFF; собираем до MAX_ITEMS
+    // 3) для каждого кандидата — USDA, затем OFF; собираем до MAX_ITEMS, без дублей по canonicalKey
+    const seenKeys = new Set();
     const picks = [];
     for (const name of candidates) {
       if (picks.length >= MAX_ITEMS) break;
 
       // 3.1 USDA
+      let picked = null;
       try{
         const usdaResp = await fetch(`${base}/ai/usda?q=${encodeURIComponent(name)}`);
         const usda = await usdaResp.json().catch(()=>null);
         if (usda && usda.item && usda.item.per100) {
-          picks.push({ name: usda.item.name || name, per100: usda.item.per100, match: 'USDA' });
-          continue;
+          picked = { name: usda.item.name || name, per100: usda.item.per100, match: 'USDA' };
         }
       }catch{}
 
       // 3.2 OFF (если USDA не нашёл)
-      try{
-        const offHits = await searchOFF(name, 10);
-        if (Array.isArray(offHits) && offHits.length) {
-          const h = offHits.find(x => Number.isFinite(+x.kcal) && Number.isFinite(+x.p) && Number.isFinite(+x.f) && Number.isFinite(+x.c));
-          if (h) {
-            picks.push({ name: h.name || name, per100: { kcal:+h.kcal, p:+h.p, f:+h.f, c:+h.c }, match: 'OpenFoodFacts' });
+      if (!picked) {
+        try{
+          const offHits = await searchOFF(name, 10);
+          if (Array.isArray(offHits) && offHits.length) {
+            const h = bestOffHit(
+              offHits.filter(x => Number.isFinite(+x.kcal) && Number.isFinite(+x.p) && Number.isFinite(+x.f) && Number.isFinite(+x.c)),
+              name
+            );
+            if (h) {
+              picked = { name: h.name || name, per100: { kcal:+h.kcal, p:+h.p, f:+h.f, c:+h.c }, match: 'OpenFoodFacts' };
+            }
           }
+        }catch{}
+      }
+
+      if (picked) {
+        const key = canonicalKey(picked.name);
+        if (key && !seenKeys.has(key)) {
+          seenKeys.add(key);
+          picks.push(picked);
         }
-      }catch{}
+      }
     }
 
     if (!picks.length){
@@ -796,7 +844,7 @@ async function analyzeDishPhoto(file){
       return;
     }
 
-    // 4) добавляем по СТРОКЕ на каждый pick
+    // 4) добавляем по строке на каждый pick
     const addedNames = [];
     for (const picked of picks) {
       addEntry();
@@ -815,11 +863,6 @@ async function analyzeDishPhoto(file){
     if (st) st.textContent = `Добавлено: ${addedNames.join(', ')}. Введите веса.`;
   }catch(e){
     if (st) st.textContent = `Ошибка ИИ: ${e.message||e}`;
+    console.warn('AI error', e);
   }
 }
-
-
-
-
-
-
