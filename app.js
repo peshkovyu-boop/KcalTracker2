@@ -727,7 +727,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
 
-// === ИИ по фото: OpenAI (/ai/openai-test) + USDA (/ai/usda) ===
+// === ИИ по фото: OpenAI (/ai/openai-test) + USDA (/ai/usda) с фолбэком на OFF ===
 async function analyzeDishPhoto(file){
   const st = document.querySelector('#aiStatus'); 
   if (st) st.textContent = 'Отправляю фото...';
@@ -745,37 +745,71 @@ async function analyzeDishPhoto(file){
     }
     const data = await r.json();
     const labels = (data && data.parsed && Array.isArray(data.parsed.items)) ? data.parsed.items : [];
+
     if (!labels.length){
       if (st) st.textContent = 'Не удалось распознать блюдо';
       return;
     }
 
-    const bestName = (labels[0].ru || labels[0].en || '').trim();
-    if (st) st.textContent = `Нашёл: ${bestName || '(без имени)'} → ищу КБЖУ...`;
+    // Соберём кандидатов: сначала en, потом ru; уберём дубли и слишком длинные
+    const candSet = new Set();
+    for (const it of labels) {
+      const a = String(it.en||'').trim();
+      const b = String(it.ru||'').trim();
+      if (a && a.length <= 40) candSet.add(a);
+      if (b && b.length <= 40) candSet.add(b);
+    }
+    const candidates = Array.from(candSet).slice(0,6);
+    if (st) st.textContent = `Нашёл по фото: ${candidates.join(', ')} — ищу КБЖУ...`;
 
-    // 2) добираем КБЖУ на 100 г через USDA
-    const usdaResp = await fetch(`${base}/ai/usda?q=${encodeURIComponent(bestName)}`);
-    const usda = await usdaResp.json();
+    // 2) пробуем USDA по очереди
+    let picked = null;
+    for (const name of candidates) {
+      const usdaResp = await fetch(`${base}/ai/usda?q=${encodeURIComponent(name)}`);
+      const usda = await usdaResp.json().catch(()=>null);
+      if (usda && usda.item && usda.item.per100) {
+        picked = { name: usda.item.name || name, per100: usda.item.per100, match: 'USDA' };
+        break;
+      }
+    }
 
-    if (!usda || !usda.item || !usda.item.per100){
-      if (st) st.textContent = 'Нашёл по фото, но не нашёл в базе USDA';
+    // 3) если USDA не нашёл — пробуем Open Food Facts
+    if (!picked) {
+      for (const name of candidates) {
+        try{
+          const offHits = await searchOFF(name, 10); // уже есть в твоём коде
+          if (Array.isArray(offHits) && offHits.length) {
+            // берём первый валидный хит
+            const h = offHits.find(x => Number.isFinite(+x.kcal) && Number.isFinite(+x.p) && Number.isFinite(+x.f) && Number.isFinite(+x.c));
+            if (h) {
+              picked = { name: h.name || name, per100: { kcal:+h.kcal, p:+h.p, f:+h.f, c:+h.c }, match: 'OpenFoodFacts' };
+              break;
+            }
+          }
+        }catch{}
+      }
+    }
+
+    if (!picked) {
+      if (st) st.textContent = 'Нашёл по фото, но не нашёл ни в USDA, ни в OFF';
       return;
     }
 
-    // 3) добавляем строку
+    // 4) добавляем строку
     addEntry();
     const i = state.rows.length-1;
-    const name = usda.item.name || bestName;
 
-    state.rows[i].product = name;
-    state.rows[i]._per100 = { ...usda.item.per100 };
-    state.rows[i].source  = { type:'ai-openai-usda', label: bestName };
+    state.rows[i].product = picked.name;
+    state.rows[i]._per100 = { ...picked.per100 };
+    state.rows[i].source  = { type:'ai', match:picked.match };
 
     const tr = document.querySelector('#tbl tbody').children[i];
-    tr.querySelector('input[data-k="product"]').value = name;
+    tr.querySelector('input[data-k="product"]').value = picked.name;
 
-    if (st) st.textContent = `Найдено: ${name} (на 100 г). Введи вес.`;
+    if (st) st.textContent = `Найдено: ${picked.name} (на 100 г). Введи вес.`;
   }catch(e){
     if (st) st.textContent = `Ошибка ИИ: ${e.message||e}`;
   }
 }
+
+
