@@ -4,7 +4,6 @@ const CACHE_KEY = 'calctracker:offCache:v6';
 const LIMIT_KEY = 'calctracker:limitKcal'; // "Предел ккал";
 const AI_WORKER_URL = 'https://red-resonance-f66e.peshkov-yu.workers.dev'
 
-
 // ========= МИНИ-БАЗА (подстраховка, на 100 г) =========
 const FOOD_DB = [
   {name:'Овсяные хлопья (сухие)', kcal:370, p:13, f:7, c:62},
@@ -74,7 +73,6 @@ async function loadFoods(){
     FOODS_BY_NAME = new Map();
   }
 }
-
 
 // ========= Open Food Facts =========
 function extractNutrients(p){
@@ -482,7 +480,6 @@ function drawPie(cv, kcalP, kcalF, kcalC){
   });
 }
 
-
 // Линия тренда (ккал по дням)
 function drawTrend(cv, points){
   ensureCanvasSize(cv);
@@ -530,7 +527,6 @@ function refreshViz(){
     if (cv3) drawTrend(cv3, days.map(d=>({label:d.date, value:d.kcal})));
   }catch(e){ console.warn('viz error', e); }
 }
-
 
 // ========= ВВОД/ПОИСК =========
 let debounceTimer = null;
@@ -665,15 +661,15 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   loadDay(dateEl ? dateEl.value : todayISO());
   if(state.rows.length===0) addEntry();
 
+  // ИИ: кнопки (через OpenAI-тестер + USDA)
   document.querySelector('#aiPhotoBtn')?.addEventListener('click', ()=> 
-  document.querySelector('#aiPhotoInput').click()
-);
-document.querySelector('#aiPhotoInput')?.addEventListener('change', async (e)=>{
-  const f = e.target.files?.[0]; if(!f) return;
-  await analyzeDishPhotoUSDA(f);
-  e.target.value = '';
-});
-
+    document.querySelector('#aiPhotoInput').click()
+  );
+  document.querySelector('#aiPhotoInput')?.addEventListener('change', async (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    await analyzeDishPhoto(f);
+    e.target.value = '';
+  });
 
   // Таблица: ввод
   $('#tbl').addEventListener('input', async (e)=>{
@@ -731,49 +727,55 @@ document.querySelector('#aiPhotoInput')?.addEventListener('change', async (e)=>{
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
 
-// ИИ по фото
-async function analyzeDishPhotoUSDA(file){
+// === ИИ по фото: OpenAI (/ai/openai-test) + USDA (/ai/usda) ===
+async function analyzeDishPhoto(file){
   const st = document.querySelector('#aiStatus'); 
   if (st) st.textContent = 'Отправляю фото...';
 
-  const form = new FormData();
-  form.append('image', file, file.name || 'photo.jpg');
-
-  const endpoint = `${AI_WORKER_URL.replace(/\/+$/,'')}/ai/food?debug=1`; // на всякий
-
+  const base = (AI_WORKER_URL || '').replace(/\/+$/,'');
   try{
-    const r = await fetch(endpoint, { method:'POST', body: form });
-    if(!r.ok){
+    // 1) получаем метки от OpenAI
+    const fd = new FormData();
+    fd.append('image', file, file.name || 'photo.jpg');
+
+    const r = await fetch(`${base}/ai/openai-test`, { method:'POST', body: fd });
+    if (!r.ok) {
       const tt = await r.text().catch(()=> '');
-      throw new Error(`HTTP ${r.status} ${r.statusText || ''} | ${tt.slice(0,200)}`);
+      throw new Error(`HTTP ${r.status} ${r.statusText||''} | ${tt.slice(0,200)}`);
     }
     const data = await r.json();
-    const items = Array.isArray(data?.items) ? data.items : [];
-    if (!items.length){ if(st) st.textContent = 'Не удалось распознать блюдо'; return; }
+    const labels = (data && data.parsed && Array.isArray(data.parsed.items)) ? data.parsed.items : [];
+    if (!labels.length){
+      if (st) st.textContent = 'Не удалось распознать блюдо';
+      return;
+    }
 
-    const best = items[0];
+    const bestName = (labels[0].ru || labels[0].en || '').trim();
+    if (st) st.textContent = `Нашёл: ${bestName || '(без имени)'} → ищу КБЖУ...`;
+
+    // 2) добираем КБЖУ на 100 г через USDA
+    const usdaResp = await fetch(`${base}/ai/usda?q=${encodeURIComponent(bestName)}`);
+    const usda = await usdaResp.json();
+
+    if (!usda || !usda.item || !usda.item.per100){
+      if (st) st.textContent = 'Нашёл по фото, но не нашёл в базе USDA';
+      return;
+    }
+
+    // 3) добавляем строку
     addEntry();
     const i = state.rows.length-1;
-    state.rows[i].product = best.name;
-    state.rows[i]._per100 = { ...best.per100 };
-    state.rows[i].source  = { type:'ai-usda', match:best.match };
+    const name = usda.item.name || bestName;
+
+    state.rows[i].product = name;
+    state.rows[i]._per100 = { ...usda.item.per100 };
+    state.rows[i].source  = { type:'ai-openai-usda', label: bestName };
 
     const tr = document.querySelector('#tbl tbody').children[i];
-    tr.querySelector('input[data-k="product"]').value = best.name;
+    tr.querySelector('input[data-k="product"]').value = name;
 
-    if (st) st.textContent = `Найдено: ${best.name} (на 100 г). Введи вес.`;
+    if (st) st.textContent = `Найдено: ${name} (на 100 г). Введи вес.`;
   }catch(e){
-    if (st) st.textContent = `Ошибка ИИ: ${e.message}`;
-    console.warn('AI endpoint:', endpoint);
+    if (st) st.textContent = `Ошибка ИИ: ${e.message||e}`;
   }
 }
-
-
-
-
-
-
-
-
-
-
