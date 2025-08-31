@@ -811,7 +811,3 @@ async function analyzeDishPhoto(file){
     if (st) st.textContent = `Ошибка ИИ: ${e.message||e}`;
   }
 }
-
-
-
-
