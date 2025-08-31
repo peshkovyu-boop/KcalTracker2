@@ -75,7 +75,7 @@ async function loadFoods(){
 }
 
 
-// ========= Open Food Facts =========
+// ========= Open Food Facts (нужно для поиска/штрих-кодов, не для AI-фото) =========
 function extractNutrients(p){
   if(!p || !p.nutriments) return null;
   const n = p.nutriments;
@@ -265,7 +265,7 @@ function toCSV(delim=';'){
   return rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(delim)).join('\n');
 }
 function downloadCSV(){
-  const csv = '\uFEFF' + toCSV(';'); // UTF-8 BOM для русских букв
+  const csv = '\uFEFF' + toCSV(';'); // UTF-8 BOM
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'calctracker.csv'; a.click();
@@ -302,18 +302,13 @@ function importCSV(text){
   saveAll(all); loadDay($('#date')?.value || todayISO());
 }
 
-// ========= ВИЗУАЛИЗАЦИИ (canvas) =========
+// ========= ВИЗУАЛИЗАЦИИ =========
 function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
 function rangeByKind(kind){
-  // выбранная дата из инпута, если есть
   const selected = (document.querySelector('#date')?.value) || todayISO();
+  if (kind === 'day') return [selected, selected];
 
-  // конец периода: для "дня" — именно выбранная дата; для остального оставляем сегодня
-  if (kind === 'day') {
-    return [selected, selected];
-  }
-
-  const end = startOfToday();                 // как и было: «до сегодня»
+  const end = startOfToday();
   const start = new Date(end);
 
   if (kind === 'week')  start.setDate(end.getDate() - 6);
@@ -323,7 +318,6 @@ function rangeByKind(kind){
   const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   return [toISO(start), toISO(end)];
 }
-
 function aggregateRange(kind){
   const [startISO, endISO] = rangeByKind(kind);
   const all = loadAll();
@@ -342,11 +336,9 @@ function aggregateRange(kind){
   }
 
   const total = days.reduce((a,d)=>({kcal:a.kcal+d.kcal, p:a.p+d.p, f:a.f+d.f, c:a.c+d.c}), {kcal:0,p:0,f:0,c:0});
-  const daysCount = days.length;
-  const filledDays = days.filter(d => d.count>0).length; // считаем только реально заполненные
-  return { total, days, startISO, endISO, daysCount, filledDays };
+  const filledDays = days.filter(d => d.count>0).length;
+  return { total, days, filledDays };
 }
-
 function clearCanvas(cv){ const ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height); }
 function ensureCanvasSize(cv){
   const r=cv.getBoundingClientRect();
@@ -354,17 +346,13 @@ function ensureCanvasSize(cv){
   cv.height = (r.height || 220) * devicePixelRatio;
   cv.style.height = (cv.height/devicePixelRatio) + 'px';
 }
-
-// KPI-датчик с подсветкой превышения
 function drawGauge(cv, value, limit){
   ensureCanvasSize(cv);
   const ctx=cv.getContext('2d'); clearCanvas(cv);
   const W=cv.width, H=cv.height; const cx=W/2, cy=H/2; const R=Math.min(W,H)*0.35;
   const baseStart = Math.PI*0.75, baseEnd = Math.PI*0.25;
   ctx.lineWidth = Math.max(12, R*0.18);
-  // фон дуги
   ctx.strokeStyle='#1a2332'; ctx.beginPath(); ctx.arc(cx,cy,R,baseStart,baseEnd,false); ctx.stroke();
-  // значение
   let pct = 0;
   if(limit>0) pct = Math.min(1, value/limit);
   const grad = ctx.createLinearGradient(0,0,W,0);
@@ -373,7 +361,6 @@ function drawGauge(cv, value, limit){
   ctx.beginPath();
   ctx.arc(cx,cy,R,baseStart, baseStart + (Math.PI*1.5)*(limit>0?Math.min(1,value/limit):0), false);
   ctx.stroke();
-  // Текст
   ctx.fillStyle = (limit>0 && value>limit) ? '#ffb3b3' : '#c5d0db';
   ctx.textAlign='center';
   ctx.font = `${Math.round(R*0.28)}px system-ui`;
@@ -381,18 +368,10 @@ function drawGauge(cv, value, limit){
   ctx.font = `${Math.round(R*0.18)}px system-ui`;
   ctx.fillStyle = (limit>0 && value>limit) ? '#ff6b6b' : '#9fb0c3';
   ctx.fillText(`Предел: ${limit||0}`, cx, cy + R*0.35);
-  if(limit>0 && value>limit){
-    ctx.font = `${Math.round(R*0.16)}px system-ui`;
-    ctx.fillStyle='#ff6b6b';
-    ctx.fillText('Превышение', cx, cy - R*0.55);
-  }
 }
-
-// Пирог БЖУ
 function drawPie(cv, kcalP, kcalF, kcalC){
   ensureCanvasSize(cv);
   const ctx = cv.getContext('2d'); clearCanvas(cv);
-
   const W = cv.width, H = cv.height;
   const cx = W/2, cy = H/2;
   const R  = Math.min(W,H) * 0.38;
@@ -469,12 +448,8 @@ function drawPie(cv, kcalP, kcalF, kcalC){
       ctx.textAlign='center';
       ctx.fillText(`${p.label} ${percent}%`, rx, ry);
     }
-
-    a0 += a;
   });
 }
-
-// Линия тренда (ккал по дням)
 function drawTrend(cv, points){
   ensureCanvasSize(cv);
   const ctx=cv.getContext('2d'); clearCanvas(cv);
@@ -651,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   loadDay(dateEl ? dateEl.value : todayISO());
   if(state.rows.length===0) addEntry();
 
-  // ИИ: кнопки (через OpenAI-тестер + USDA)
+  // ИИ: кнопки (через /ai/food воркера)
   document.querySelector('#aiPhotoBtn')?.addEventListener('click', ()=> 
     document.querySelector('#aiPhotoInput').click()
   );
@@ -708,7 +683,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   $('#findBarcode').addEventListener('click', onFindBarcode);
   $('#scanCamera').addEventListener('click', startCameraScan);
   $('#closeCam').addEventListener('click', stopCameraScan);
-  // Кнопка "Фото штрих-кода"
   $('#photoBtn').addEventListener('click', ()=> $('#barcodeImage').click());
   $('#barcodeImage').addEventListener('change', async (e)=>{ const f = e.target.files?.[0]; if(!f) return; await scanImageFile(f); e.target.value=''; });
 
@@ -717,124 +691,113 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   let resizeT; window.addEventListener('resize', ()=>{ clearTimeout(resizeT); resizeT=setTimeout(refreshViz, 200); });
 });
 
-/* ===================== ИИ ПО ФОТО: OpenAI-only, без USDA/OFF ===================== */
+/* ===================== ИИ ПО ФОТО: несколько строк, чистка-мусора, дедуп ===================== */
 
-// аккуратное имя для вывода
-function aiDisplayName(it){
-  const ru = String(it?.ru||'').trim();
-  const en = String(it?.en||'').trim();
-  return ru || en || 'Блюдо';
+// удаляем «ингредиентные» метки, если модель дала нормальное блюдо
+function aiCleanItems(items){
+  const generic = new Set([
+    'sauce','соус','tortilla','wrap','лаваш','bread','хлеб',
+    'rice','рис','greens','зелень',
+    'meat','мясо','beef','говядина','chicken','курица'
+  ]);
+  // есть ли явный «блюдный» нейминг (скобки или >=3 слов)?
+  const hasDishy = items.some(it=>{
+    const name = (it?.ru || it?.en || '').toLowerCase();
+    return /\(|\)|\s.+\s/.test(name);
+  });
+  if (!hasDishy) return items;
+
+  return items.filter(it=>{
+    const name = (it?.ru || it?.en || '').toLowerCase().trim();
+    if (!name) return false;
+    if (generic.has(name)) return false;
+    return true;
+  });
 }
 
-// канонический ключ для дедупа (первые 2 слова, без пунктуации)
-function aiCanonKey(name){
-  return String(name||'')
-    .toLowerCase()
-    .replace(/\(.*?\)/g,'')
-    .replace(/[^\p{L}\p{N}\s]/gu,' ')
-    .replace(/\s+/g,' ')
-    .trim()
-    .split(' ')
-    .slice(0,2)
-    .join(' ');
+// канонический ключ для дедупа
+function canonicalKey(name){
+  let s = String(name||'').toLowerCase();
+  s = s.split('•')[0];
+  s = s.split(' - ')[0];
+  s = s.replace(/\(.*?\)/g,'');
+  s = s.replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
+  s = s.split(' ').slice(0, 3).join(' ');
+  return s;
 }
 
-// === ИИ по фото: добавляем строки для КАЖДОГО найденного блюда ===
+// === ИИ по фото: вызываем /ai/food и добавляем несколько строк ===
 async function analyzeDishPhoto(file){
-  const st = document.querySelector('#aiStatus');
+  const st = document.querySelector('#aiStatus'); 
   if (st) st.textContent = 'Отправляю фото...';
 
   const base = (AI_WORKER_URL || '').replace(/\/+$/,'');
-  const endpoint = `${base}/ai/food`;
   const MAX_ITEMS = 5;
 
   try{
     const fd = new FormData();
     fd.append('image', file, file.name || 'photo.jpg');
 
-    const r = await fetch(endpoint, { method:'POST', body: fd });
-    if (!r.ok){
+    const r = await fetch(`${base}/ai/food`, { method:'POST', body: fd });
+    if (!r.ok) {
       const tt = await r.text().catch(()=> '');
       throw new Error(`HTTP ${r.status} ${r.statusText||''} | ${tt.slice(0,200)}`);
     }
-
     const data = await r.json();
-    const raw = Array.isArray(data?.items) ? data.items : [];
 
-    if (!raw.length){
+    let items = Array.isArray(data?.items) ? data.items : [];
+    if (!items.length){
       if (st) st.textContent = 'Не удалось распознать блюдо';
       return;
     }
 
-    // дедуп: по ключу имени (ru/en), приоритет — есть per100 и более конкретное имя
-    const seen = new Map();
-    for (const it of raw){
-      const name = aiDisplayName(it);
-      const key = aiCanonKey(name);
-      if (!key) continue;
+    // чистка от «ингредиентных» тегов при наличии явного блюда
+    items = aiCleanItems(items);
 
-      const candidate = {
-        name,
-        per100: it?.per100 && Number.isFinite(+it.per100.kcal)
-          ? {
-              kcal:+(+it.per100.kcal).toFixed(1),
-              p:+(+it.per100.p||0).toFixed(2),
-              f:+(+it.per100.f||0).toFixed(2),
-              c:+(+it.per100.c||0).toFixed(2),
-            }
-          : null
-      };
+    // нормализуем объекты и отсечём пустые/битые
+    items = items.map(it => ({
+      name: String(it?.ru || it?.en || '').trim(),
+      per100: (it?.per100 && isValidPer100(it.per100)) ? it.per100 : null
+    })).filter(x => x.name);
 
-      const prev = seen.get(key);
-      if (!prev){ seen.set(key, candidate); continue; }
-
-      // если новый имеет пер100, а старый нет — заменим;
-      // при равенстве пер100 — оставим более «длинное» имя (чуть конкретнее)
-      const prevHas = !!prev.per100, curHas = !!candidate.per100;
-      if (!prevHas && curHas) { seen.set(key, candidate); continue; }
-      if (prevHas === curHas && candidate.name.length > prev.name.length) {
-        seen.set(key, candidate);
-      }
-    }
-
-    const picks = Array.from(seen.values())
-      .sort((a,b)=>{
-        const pa = a.per100 ? 1 : 0, pb = b.per100 ? 1 : 0;
-        if (pb!==pa) return pb-pa;
-        return b.name.length - a.name.length;
-      })
-      .slice(0, MAX_ITEMS);
-
-    if (!picks.length){
-      if (st) st.textContent = 'Нашёл по фото, но ничего осмысленного не осталось после дедупликации';
+    if (!items.length){
+      if (st) st.textContent = 'Распознано, но метки слишком общие';
       return;
     }
 
-    const added = [];
-    for (const p of picks){
-      addEntry();
-      const i = state.rows.length - 1;
+    // дедуп по каноническому ключу
+    const seen = new Set();
+    const picks = [];
+    for (const it of items) {
+      const key = canonicalKey(it.name);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      picks.push(it);
+      if (picks.length >= MAX_ITEMS) break;
+    }
 
-      state.rows[i].product = p.name;
-      if (p.per100){
-        state.rows[i]._per100 = { ...p.per100 };
-        state.rows[i].source  = { type:'ai-openai' };
-      } else {
-        // калории не пришли — оставим строку без автоподстановки, пользователь введёт вес/кбжу вручную
-        state.rows[i]._per100 = null;
-        state.rows[i].source  = { type:'ai-openai', note:'no-per100' };
-      }
+    // добавляем строки
+    const added = [];
+    for (const picked of picks) {
+      addEntry();
+      const i = state.rows.length-1;
+
+      state.rows[i].product = picked.name;
+      if (picked.per100) state.rows[i]._per100 = { ...picked.per100 };
+      state.rows[i].source  = { type:'ai', match:'OpenAI' };
 
       const tr = document.querySelector('#tbl tbody').children[i];
-      if (tr) tr.querySelector('input[data-k="product"]').value = p.name;
+      tr.querySelector('input[data-k="product"]').value = picked.name;
 
-      added.push(p.name);
+      added.push(picked.name);
     }
 
     if (st) st.textContent = `Добавлено: ${added.join(', ')}. Введите веса.`;
   }catch(e){
     if (st) st.textContent = `Ошибка ИИ: ${e.message||e}`;
-    console.warn('AI endpoint error', e);
+    console.warn('AI error', e);
   }
 }
-
+function isValidPer100(p){
+  return p && ['kcal','p','f','c'].every(k => Number.isFinite(+p[k]));
+}
